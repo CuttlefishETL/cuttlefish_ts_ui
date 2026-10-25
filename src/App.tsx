@@ -1,19 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 import { MenuBar } from "./components/MenuBar";
 import { Sidebar } from "./components/Sidebar";
 import { TabsPanel } from "./components/TabsPanel";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { AboutDialog } from "./components/AboutDialog";
 import { AuthDialog } from "./components/AuthDialog";
 import { INITIAL_SERVERS, SETTINGS_TABS, createServer } from "./data";
 import type { Server, TabId } from "./types";
 import { checkConnection, type CheckStatus } from "./checkConnection";
+import { baseNameOf } from "./pathUtils";
 
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 600;
 const DEFAULT_WIDTH = 260;
 const STORAGE_KEY = "sidebar-width";
+const FILE_KEY = "current-settings-file";
+const RECENT_KEY = "recent-files";
+const MAX_RECENT = 8;
+
+interface SettingsFile {
+  version: 1;
+  servers: Server[];
+}
 
 function loadSidebarWidth(): number {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -24,7 +36,47 @@ function loadSidebarWidth(): number {
   return DEFAULT_WIDTH;
 }
 
+function loadRecentFiles(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) {
+      return arr
+        .filter((x): x is string => typeof x === "string")
+        .slice(0, MAX_RECENT);
+    }
+  } catch {
+    // игнорируем повреждённое значение
+  }
+  return [];
+}
+
+function pushRecent(list: string[], path: string): string[] {
+  return [path, ...list.filter((p) => p !== path)].slice(0, MAX_RECENT);
+}
+
+function serialize(servers: Server[]): string {
+  const data: SettingsFile = { version: 1, servers };
+  return JSON.stringify(data, null, 2);
+}
+
+function parseSettings(text: string): Server[] {
+  const data = JSON.parse(text);
+  if (!data || !Array.isArray(data.servers)) {
+    throw new Error("Некорректный формат файла настроек");
+  }
+  return data.servers.map((s: any, i: number): Server => ({
+    id: String(s.id ?? `server-${Date.now()}-${i}`),
+    name: String(s.name ?? ""),
+    url: String(s.url ?? ""),
+    port: Number(s.port) || 0,
+  }));
+}
+
 function App() {
+  const initialPathRef = useRef<string | null>(localStorage.getItem(FILE_KEY));
+
   const [servers, setServers] = useState<Server[]>(INITIAL_SERVERS);
   const [selectedId, setSelectedId] = useState<string | null>(
     INITIAL_SERVERS[0]?.id ?? null
@@ -38,8 +90,6 @@ function App() {
   const [activeSubTabs, setActiveSubTabs] = useState<Record<string, TabId>>({});
 
   const [savedServers, setSavedServers] = useState<Set<string>>(new Set());
-
-  // Множество подключённых серверов — можно работать с несколькими одновременно
   const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
 
   const [checkStatuses, setCheckStatuses] = useState<
@@ -48,16 +98,22 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [authTarget, setAuthTarget] = useState<Server | null>(null);
 
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(
+    initialPathRef.current
+  );
+  const [dirty, setDirty] = useState(false);
+
+  const [recentFiles, setRecentFiles] = useState<string[]>(loadRecentFiles);
+
   const [sidebarWidth, setSidebarWidth] = useState<number>(loadSidebarWidth);
   const [isResizing, setIsResizing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Server | null>(null);
   const [pendingClose, setPendingClose] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   const bypassCloseCheck = useRef(false);
-  const serversRef = useRef(servers);
-  const savedServersRef = useRef(savedServers);
-  serversRef.current = servers;
-  savedServersRef.current = savedServers;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
 
   // --- Проверки ---
   const runChecks = async (list: Server[]) => {
@@ -77,8 +133,52 @@ function App() {
     );
   };
 
+  const applyLoadedServers = (loaded: Server[]) => {
+    setServers(loaded);
+    setSavedServers(new Set(loaded.map((s) => s.id)));
+    const first = loaded[0]?.id ?? null;
+    setSelectedId(first);
+    setOpenTabs(first ? [first] : []);
+    setActiveTab(first);
+    setActiveSubTabs({});
+    setConnectedIds(new Set());
+    setDirty(false);
+    runChecks(loaded);
+  };
+
+  // --- Работа со списком последних файлов ---
+  const addRecent = (path: string) => {
+    setRecentFiles((prev) => pushRecent(prev, path));
+  };
+
+  const removeRecent = (path: string) => {
+    setRecentFiles((prev) => prev.filter((p) => p !== path));
+  };
+
   useEffect(() => {
-    runChecks(INITIAL_SERVERS);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentFiles));
+  }, [recentFiles]);
+
+  // --- Загрузка последнего файла при старте ---
+  useEffect(() => {
+    const path = initialPathRef.current;
+    (async () => {
+      if (path) {
+        try {
+          const text = await invoke<string>("read_file", { path });
+          const loaded = parseSettings(text);
+          applyLoadedServers(loaded);
+          addRecent(path);
+          return;
+        } catch (err) {
+          console.warn("Не удалось открыть последний файл настроек:", err);
+          localStorage.removeItem(FILE_KEY);
+          setCurrentFilePath(null);
+          removeRecent(path);
+        }
+      }
+      runChecks(INITIAL_SERVERS);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -107,7 +207,16 @@ function App() {
     localStorage.setItem(STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
-  // --- Перехват закрытия окна ---
+  // Заголовок окна всегда "Cuttlefish-UI"
+  useEffect(() => {
+    getCurrentWindow()
+      .setTitle("Cuttlefish-UI")
+      .catch((err) =>
+        console.warn("Не удалось установить заголовок окна:", err)
+      );
+  }, []);
+
+  // --- Перехват закрытия ---
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
@@ -116,10 +225,7 @@ function App() {
         const appWindow = getCurrentWindow();
         const fn = await appWindow.onCloseRequested(async (event) => {
           if (bypassCloseCheck.current) return;
-          const hasUnsaved = serversRef.current.some(
-            (s) => !savedServersRef.current.has(s.id)
-          );
-          if (hasUnsaved) {
+          if (dirtyRef.current) {
             event.preventDefault();
             setPendingClose(true);
           }
@@ -147,6 +253,129 @@ function App() {
     }
   };
 
+  // --- Выход из меню «Файл» ---
+  const handleExit = async () => {
+    if (dirty) {
+      setPendingClose(true);
+      return;
+    }
+    try {
+      await getCurrentWindow().destroy();
+    } catch (err) {
+      console.error("Ошибка выхода из программы:", err);
+    }
+  };
+
+  // --- Файловые операции ---
+  const saveAs = async (): Promise<boolean> => {
+    try {
+      const path = await saveDialog({
+        title: "Сохранить файл настроек",
+        defaultPath: currentFilePath ?? "servers.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path || typeof path !== "string") return false;
+      await invoke("write_file", { path, content: serialize(servers) });
+      setCurrentFilePath(path);
+      localStorage.setItem(FILE_KEY, path);
+      setSavedServers(new Set(servers.map((s) => s.id)));
+      setDirty(false);
+      addRecent(path);
+      return true;
+    } catch (err) {
+      alert(`Не удалось сохранить файл: ${err}`);
+      return false;
+    }
+  };
+
+  const saveToCurrent = async (): Promise<boolean> => {
+    if (!currentFilePath) return saveAs();
+    try {
+      await invoke("write_file", {
+        path: currentFilePath,
+        content: serialize(servers),
+      });
+      setSavedServers(new Set(servers.map((s) => s.id)));
+      setDirty(false);
+      return true;
+    } catch (err) {
+      alert(`Не удалось сохранить файл: ${err}`);
+      return false;
+    }
+  };
+
+  const handleNewFile = () => {
+    if (
+      dirty &&
+      !confirm(
+        "Есть несохранённые изменения. Создать новый файл без сохранения?"
+      )
+    ) {
+      return;
+    }
+    setServers([]);
+    setSavedServers(new Set());
+    setSelectedId(null);
+    setOpenTabs([]);
+    setActiveTab(null);
+    setActiveSubTabs({});
+    setConnectedIds(new Set());
+    setCheckStatuses({});
+    setCurrentFilePath(null);
+    localStorage.removeItem(FILE_KEY);
+    setDirty(false);
+  };
+
+  const handleOpenFile = async () => {
+    if (
+      dirty &&
+      !confirm(
+        "Есть несохранённые изменения. Открыть другой файл без сохранения?"
+      )
+    ) {
+      return;
+    }
+    try {
+      const path = await openDialog({
+        title: "Открыть файл настроек",
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path || typeof path !== "string") return;
+      const text = await invoke<string>("read_file", { path });
+      const loaded = parseSettings(text);
+      applyLoadedServers(loaded);
+      setCurrentFilePath(path);
+      localStorage.setItem(FILE_KEY, path);
+      addRecent(path);
+    } catch (err) {
+      alert(`Не удалось открыть файл: ${err}`);
+    }
+  };
+
+  const handleOpenRecent = async (path: string) => {
+    if (path === currentFilePath) return;
+    if (
+      dirty &&
+      !confirm(
+        "Есть несохранённые изменения. Открыть другой файл без сохранения?"
+      )
+    ) {
+      return;
+    }
+    try {
+      const text = await invoke<string>("read_file", { path });
+      const loaded = parseSettings(text);
+      applyLoadedServers(loaded);
+      setCurrentFilePath(path);
+      localStorage.setItem(FILE_KEY, path);
+      addRecent(path);
+    } catch (err) {
+      alert(`Не удалось открыть файл: ${err}`);
+      removeRecent(path);
+    }
+  };
+
   // --- Вкладки ---
   const openServerTab = (serverId: string) => {
     setSelectedId(serverId);
@@ -166,8 +395,6 @@ function App() {
       }
       return next;
     });
-    // Подключение при закрытии вкладки НЕ сбрасываем —
-    // пользователь может вернуться к серверу без повторного входа.
   };
 
   const handleAdd = () => {
@@ -176,6 +403,7 @@ function App() {
     setSelectedId(server.id);
     setOpenTabs((prev) => [...prev, server.id]);
     setActiveTab(server.id);
+    setDirty(true);
     runChecks([server]);
   };
 
@@ -226,6 +454,8 @@ function App() {
     } else {
       setSelectedId(remaining[Math.min(idx, remaining.length - 1)]?.id ?? null);
     }
+
+    setDirty(true);
   };
 
   // --- Настройка сервера ---
@@ -233,24 +463,24 @@ function App() {
     setServers((prev) =>
       prev.map((s) => (s.id === serverId ? { ...s, ...patch } : s))
     );
+    setDirty(true);
   };
 
-  const markSaved = (serverId: string, saved: boolean) => {
+  const markUnsaved = (serverId: string) => {
     setSavedServers((prev) => {
       const next = new Set(prev);
-      if (saved) next.add(serverId);
-      else next.delete(serverId);
+      next.delete(serverId);
       return next;
     });
   };
 
-  const handleSave = (id: string) => {
-    markSaved(id, true);
+  const handleSaveServer = async (id: string) => {
     const s = servers.find((x) => x.id === id);
-    if (s) runChecks([s]);
+    const ok = await saveToCurrent();
+    if (ok && s) runChecks([s]);
   };
 
-  // --- Обновить ---
+  // --- Обновить статусы ---
   const handleRefresh = async () => {
     if (servers.length === 0) return;
     setRefreshing(true);
@@ -261,27 +491,44 @@ function App() {
     }
   };
 
-  // --- Подключение / отключение по двойному щелчку ---
-  const handleServerDoubleClick = (serverId: string) => {
-    if (connectedIds.has(serverId)) {
-      // Уже подключён — отключаем без диалога
-      setConnectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(serverId);
-        return next;
-      });
-      return;
-    }
+  // --- Подключение / отключение ---
+  const handleConnect = (serverId: string) => {
+    if (connectedIds.has(serverId)) return;
     const server = servers.find((s) => s.id === serverId);
-    if (!server) return;
-    setAuthTarget(server);
+    if (server) setAuthTarget(server);
+  };
+
+  const handleDisconnect = (serverId: string) => {
+    setConnectedIds((prev) => {
+      if (!prev.has(serverId)) return prev;
+      const next = new Set(prev);
+      next.delete(serverId);
+      return next;
+    });
+  };
+
+  const handleReconnect = (serverId: string) => {
+    setConnectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(serverId);
+      return next;
+    });
+    const server = servers.find((s) => s.id === serverId);
+    if (server) setAuthTarget(server);
+  };
+
+  const handleServerDoubleClick = (serverId: string) => {
+    // Уже подключён — двойной клик ничего не делает
+    if (connectedIds.has(serverId)) return;
+    handleConnect(serverId);
   };
 
   const handleAuthSubmit = () => {
     if (!authTarget) return;
+    const id = authTarget.id;
     setConnectedIds((prev) => {
       const next = new Set(prev);
-      next.add(authTarget.id);
+      next.add(id);
       return next;
     });
     setAuthTarget(null);
@@ -301,7 +548,18 @@ function App() {
 
   return (
     <div className="app">
-      <MenuBar />
+      <MenuBar
+        dirty={dirty}
+        recentFiles={recentFiles.filter((p) => p !== currentFilePath)}
+        currentFilePath={currentFilePath}
+        onNew={handleNewFile}
+        onOpen={handleOpenFile}
+        onSave={saveToCurrent}
+        onSaveAs={saveAs}
+        onOpenRecent={handleOpenRecent}
+        onExit={handleExit}
+        onAbout={() => setAboutOpen(true)}
+      />
       <div className="body">
         <div className="sidebar-wrap" style={{ width: sidebarWidth }}>
           <Sidebar
@@ -312,6 +570,9 @@ function App() {
             refreshing={refreshing}
             onSelect={openServerTab}
             onDoubleClick={handleServerDoubleClick}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+            onReconnect={handleReconnect}
             onAdd={handleAdd}
             onDelete={handleDeleteClick}
             onRefresh={handleRefresh}
@@ -338,8 +599,8 @@ function App() {
           onTabClose={closeTab}
           onSubTabSelect={handleSubTabSelect}
           onChange={handleServerChange}
-          onSave={handleSave}
-          onEdit={(id) => markSaved(id, false)}
+          onSave={handleSaveServer}
+          onEdit={markUnsaved}
         />
       </div>
 
@@ -366,6 +627,8 @@ function App() {
         onConfirm={handleCloseConfirm}
         onCancel={() => setPendingClose(false)}
       />
+
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       <AuthDialog
         open={authTarget !== null}
