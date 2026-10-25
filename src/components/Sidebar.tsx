@@ -1,155 +1,58 @@
-import { useState } from "react";
-import type { Server } from "../types";
-import type { CheckStatus } from "../checkConnection";
-import { ContextMenu, type AnchorRect } from "./ContextMenu";
+import { NodeId, ServerLeaf, ServerNode } from "../types";
+import { CheckStatus } from "../checkConnection";
+import { ServerTree } from "./ServerTree";
 
-interface SidebarProps {
-  servers: Server[];
-  selectedId: string | null;
-  connectedIds: Set<string>;
-  checkStatuses: Record<string, CheckStatus>;
-  refreshing: boolean;
-  onSelect: (id: string) => void;
-  onDoubleClick: (id: string) => void;
-  onConnect: (id: string) => void;
-  onDisconnect: (id: string) => void;
-  onReconnect: (id: string) => void;
+interface Props {
+  width: number;
+  nodes: ServerNode[];
+  expanded: Set<NodeId>;
+  selectedId: NodeId | null;
+  statusById: Record<NodeId, CheckStatus>;
+  onToggle: (id: NodeId) => void;
+  onSelect: (leaf: ServerLeaf) => void;
+  onContext: (id: NodeId, x: number, y: number) => void;
+  onRootContext: (x: number, y: number) => void;
   onAdd: () => void;
-  onDelete: () => void;
-  onRefresh: () => void;
-}
-
-const STATUS_TITLE: Record<CheckStatus, string> = {
-  unknown: "Не проверен",
-  checking: "Проверка...",
-  ok: "Работает",
-  error: "Недоступен",
-};
-
-interface ContextState {
-  anchor: AnchorRect;
-  serverId: string;
 }
 
 export function Sidebar({
-  servers,
+  width,
+  nodes,
+  expanded,
   selectedId,
-  connectedIds,
-  checkStatuses,
-  refreshing,
+  statusById,
+  onToggle,
   onSelect,
-  onDoubleClick,
-  onConnect,
-  onDisconnect,
-  onReconnect,
+  onContext,
+  onRootContext,
   onAdd,
-  onDelete,
-  onRefresh,
-}: SidebarProps) {
-  const [context, setContext] = useState<ContextState | null>(null);
-
-  const contextServer = context
-    ? servers.find((s) => s.id === context.serverId)
-    : undefined;
-  const contextStatus: CheckStatus = contextServer
-    ? checkStatuses[contextServer.id] ?? "unknown"
-    : "unknown";
-  const contextIsConnected = contextServer
-    ? connectedIds.has(contextServer.id)
-    : false;
-  const menuAvailable = contextStatus === "ok";
-
+}: Props) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-toolbar">
-        <button className="toolbar-btn" onClick={onAdd}>
-          + Добавить
-        </button>
-        <button
-          className="toolbar-btn danger"
-          onClick={onDelete}
-          disabled={!selectedId}
-        >
-          Удалить
-        </button>
-        <button
-          className="toolbar-btn"
-          onClick={onRefresh}
-          disabled={refreshing || servers.length === 0}
-          title="Перепроверить все серверы"
-        >
-          {refreshing ? "⟳" : "Обновить"}
+    <aside
+      className="sidebar"
+      style={{ width }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onRootContext(e.clientX, e.clientY);
+      }}
+    >
+      <div className="sidebar-header">
+        <span>Серверы</span>
+        <button className="icon-button" onClick={onAdd} title="Добавить">
+          +
         </button>
       </div>
-
-      <ul className="server-list">
-        {servers.map((server) => {
-          const status = checkStatuses[server.id] ?? "unknown";
-          const isConnected = connectedIds.has(server.id);
-          return (
-            <li
-              key={server.id}
-              className={`server-item ${
-                selectedId === server.id ? "active" : ""
-              }`}
-              onClick={() => onSelect(server.id)}
-              onDoubleClick={() => onDoubleClick(server.id)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setContext({
-                  anchor: {
-                    left: r.left,
-                    top: r.top,
-                    bottom: r.bottom,
-                    right: r.right,
-                  },
-                  serverId: server.id,
-                });
-              }}
-              title="Двойной щелчок — подключиться / отключиться; правый клик — меню"
-            >
-              <span className="server-name">
-                {server.name || "(без имени)"}
-              </span>
-              <span
-                className={`server-status ${status}`}
-                title={STATUS_TITLE[status]}
-              />
-              {isConnected && (
-                <span className="server-connected" title="Подключено">
-                  🔒
-                </span>
-              )}
-            </li>
-          );
-        })}
-        {servers.length === 0 && (
-          <li className="server-list-empty">Нет серверов</li>
-        )}
-      </ul>
-
-      {context && (
-        <ContextMenu
-          anchor={context.anchor}
-          items={[
-            {
-              label: "Подключиться",
-              action: () => onConnect(context.serverId),
-              disabled: !menuAvailable || contextIsConnected,
-            },
-            {
-              label: "Отключиться",
-              action: () => onDisconnect(context.serverId),
-              disabled: !menuAvailable || !contextIsConnected,
-            },
-            {
-              label: "Переподключиться",
-              action: () => onReconnect(context.serverId),
-              disabled: !menuAvailable || !contextIsConnected,
-            },
-          ]}
-          onClose={() => setContext(null)}
+      {nodes.length === 0 ? (
+        <div className="sidebar-empty">Нет серверов</div>
+      ) : (
+        <ServerTree
+          nodes={nodes}
+          expanded={expanded}
+          selectedId={selectedId}
+          statusById={statusById}
+          onToggle={onToggle}
+          onSelect={onSelect}
+          onContext={onContext}
         />
       )}
     </aside>

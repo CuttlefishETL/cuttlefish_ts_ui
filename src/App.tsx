@@ -1,668 +1,484 @@
-import { useEffect, useRef, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import "./App.css";
-import { MenuBar } from "./components/MenuBar";
+
+import { NodeId, ServerLeaf, ServerNode, TabId } from "./types";
+import { CURRENT_VERSION, parseSettings, serializeSettings } from "./appSettings";
+import {
+  findNode,
+  findPath,
+  insertChild,
+  isServer,
+  makeId,
+  moveNode,
+  removeNode,
+  updateNode,
+  walkLeaves,
+} from "./treeUtils";
+import { INITIAL_SERVERS, SETTINGS_TABS } from "./data";
+import { CheckStatus, checkConnection } from "./checkConnection";
 import { Sidebar } from "./components/Sidebar";
 import { TabsPanel } from "./components/TabsPanel";
-import { ConfirmDialog } from "./components/ConfirmDialog";
+import { MenuBar } from "./components/MenuBar";
 import { AboutDialog } from "./components/AboutDialog";
 import { AuthDialog } from "./components/AuthDialog";
-import { INITIAL_SERVERS, SETTINGS_TABS, createServer } from "./data";
-import type { Server, TabId } from "./types";
-import { checkConnection, type CheckStatus } from "./checkConnection";
+import { SettingsDialog } from "./components/SettingsDialog";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ContextMenu, ContextMenuItem } from "./components/ContextMenu";
+import { ServerEditDialog, ServerEditDraft } from "./components/ServerEditDialog";
 import { baseNameOf } from "./pathUtils";
 
-import { SettingsDialog } from "./components/SettingsDialog";
-import {
-  loadAppSettings,
-  saveAppSettings,
-  type AppSettings,
-} from "./appSettings";
+const LS_EXPANDED = "cuttlefish.expanded";
+const LS_SIDEBAR_WIDTH = "cuttlefish.sidebarWidth";
+const LS_RECENT = "cuttlefish.recentFiles";
 
-
-const MIN_WIDTH = 160;
-const MAX_WIDTH = 600;
-const DEFAULT_WIDTH = 260;
-const STORAGE_KEY = "sidebar-width";
-const FILE_KEY = "current-settings-file";
-const RECENT_KEY = "recent-files";
-const MAX_RECENT = 8;
-
-interface SettingsFile {
-  version: 1;
-  servers: Server[];
+function loadExpanded(): Set<NodeId> {
+  try {
+    const raw = localStorage.getItem(LS_EXPANDED);
+    return new Set(raw ? (JSON.parse(raw) as NodeId[]) : []);
+  } catch {
+    return new Set();
+  }
 }
 
 function loadSidebarWidth(): number {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  const num = raw ? Number(raw) : NaN;
-  if (Number.isFinite(num)) {
-    return Math.min(Math.max(num, MIN_WIDTH), MAX_WIDTH);
-  }
-  return DEFAULT_WIDTH;
+  const raw = localStorage.getItem(LS_SIDEBAR_WIDTH);
+  const n = raw ? Number(raw) : 260;
+  return Number.isFinite(n) && n >= 160 && n <= 500 ? n : 260;
 }
 
 function loadRecentFiles(): string[] {
   try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    if (Array.isArray(arr)) {
-      return arr
-        .filter((x): x is string => typeof x === "string")
-        .slice(0, MAX_RECENT);
-    }
+    const raw = localStorage.getItem(LS_RECENT);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
   } catch {
-    // игнорируем повреждённое значение
+    return [];
   }
-  return [];
 }
 
-function pushRecent(list: string[], path: string): string[] {
-  return [path, ...list.filter((p) => p !== path)].slice(0, MAX_RECENT);
+interface EditState {
+  mode: "add" | "edit";
+  kind: "folder" | "server";
+  parentId: NodeId | null;
+  editingId: NodeId | null;
+  initial: ServerEditDraft;
 }
 
-function serialize(servers: Server[]): string {
-  const data: SettingsFile = { version: 1, servers };
-  return JSON.stringify(data, null, 2);
+interface CtxMenuState {
+  x: number;
+  y: number;
+  targetId: NodeId | null;
 }
 
-function parseSettings(text: string): Server[] {
-  const data = JSON.parse(text);
-  if (!data || !Array.isArray(data.servers)) {
-    throw new Error("Некорректный формат файла настроек");
-  }
-  return data.servers.map((s: any, i: number): Server => ({
-    id: String(s.id ?? `server-${Date.now()}-${i}`),
-    name: String(s.name ?? ""),
-    url: String(s.url ?? ""),
-    port: Number(s.port) || 0,
-  }));
+interface DeleteState {
+  id: NodeId;
+  name: string;
+  leafCount: number;
 }
 
-function App() {
-  const initialPathRef = useRef<string | null>(localStorage.getItem(FILE_KEY));
-
-  const [servers, setServers] = useState<Server[]>(INITIAL_SERVERS);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    INITIAL_SERVERS[0]?.id ?? null
-  );
-  const [openTabs, setOpenTabs] = useState<string[]>(
-    INITIAL_SERVERS[0] ? [INITIAL_SERVERS[0].id] : []
-  );
-  const [activeTab, setActiveTab] = useState<string | null>(
-    INITIAL_SERVERS[0]?.id ?? null
-  );
-  const [activeSubTabs, setActiveSubTabs] = useState<Record<string, TabId>>({});
-
-  const [savedServers, setSavedServers] = useState<Set<string>>(new Set());
-  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
-
-  const [checkStatuses, setCheckStatuses] = useState<
-    Record<string, CheckStatus>
-  >({});
-  const [refreshing, setRefreshing] = useState(false);
-  const [authTarget, setAuthTarget] = useState<Server | null>(null);
-
-  const [currentFilePath, setCurrentFilePath] = useState<string | null>(
-    initialPathRef.current
-  );
-  const [dirty, setDirty] = useState(false);
-
-  const [recentFiles, setRecentFiles] = useState<string[]>(loadRecentFiles);
-
+export default function App() {
+  const [servers, setServers] = useState<ServerNode[]>(INITIAL_SERVERS);
+  const [selectedId, setSelectedId] = useState<NodeId | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("settings");
+  const [expanded, setExpanded] = useState<Set<NodeId>>(loadExpanded);
+  const [statusById, setStatusById] = useState<Record<NodeId, CheckStatus>>({});
   const [sidebarWidth, setSidebarWidth] = useState<number>(loadSidebarWidth);
-  const [isResizing, setIsResizing] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<Server | null>(null);
-  const [pendingClose, setPendingClose] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
+  const [settingsFilePath, setSettingsFilePath] = useState<string | null>(null);
+  const [recentFiles, setRecentFiles] = useState<string[]>(loadRecentFiles);
+  const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<DeleteState | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
-  const [appSettings, setAppSettings] = useState<AppSettings>(loadAppSettings);
-  const [appSettingsOpen, setAppSettingsOpen] = useState(false);
+  // --- persistence helpers ---
+  const persistExpanded = (next: Set<NodeId>) => {
+    try { localStorage.setItem(LS_EXPANDED, JSON.stringify([...next])); } catch { /* noop */ }
+  };
+  const persistSidebarWidth = (w: number) => {
+    try { localStorage.setItem(LS_SIDEBAR_WIDTH, String(w)); } catch { /* noop */ }
+  };
+  const persistRecent = (list: string[]) => {
+    try { localStorage.setItem(LS_RECENT, JSON.stringify(list)); } catch { /* noop */ }
+  };
 
-  const bypassCloseCheck = useRef(false);
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
-
-  // --- Проверки ---
-  const runChecks = async (list: Server[]) => {
-    if (list.length === 0) return;
-    setCheckStatuses((prev) => {
-      const next = { ...prev };
-      list.forEach((s) => {
-        next[s.id] = "checking";
-      });
+  const pushRecent = (path: string) => {
+    setRecentFiles((prev) => {
+      const next = [path, ...prev.filter((p) => p !== path)].slice(0, 10);
+      persistRecent(next);
       return next;
     });
-    await Promise.all(
-      list.map(async (s) => {
-        const res = await checkConnection(s.url, s.port);
-        setCheckStatuses((prev) => ({ ...prev, [s.id]: res.status }));
-      })
-    );
   };
 
-  const applyLoadedServers = (loaded: Server[]) => {
-    setServers(loaded);
-    setSavedServers(new Set(loaded.map((s) => s.id)));
-    const first = loaded[0]?.id ?? null;
-    setSelectedId(first);
-    setOpenTabs(first ? [first] : []);
-    setActiveTab(first);
-    setActiveSubTabs({});
-    setConnectedIds(new Set());
-    setDirty(false);
-    runChecks(loaded);
+  const expandParent = (id: NodeId) => {
+    setExpanded((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev).add(id);
+      persistExpanded(next);
+      return next;
+    });
   };
 
-  // --- Работа со списком последних файлов ---
-  const addRecent = (path: string) => {
-    setRecentFiles((prev) => pushRecent(prev, path));
+  // --- derived ---
+  const selectedNode = selectedId ? findNode(servers, selectedId) : null;
+  const selectedLeaf: ServerLeaf | null =
+    selectedNode && isServer(selectedNode) ? selectedNode : null;
+
+  const breadcrumbs = useMemo(
+    () => (selectedId ? findPath(servers, selectedId) : []),
+    [servers, selectedId],
+  );
+
+  // --- expand / collapse ---
+  const toggleExpand = (id: NodeId) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      persistExpanded(next);
+      return next;
+    });
   };
 
-  const removeRecent = (path: string) => {
-    setRecentFiles((prev) => prev.filter((p) => p !== path));
+  // --- connection checks ---
+  const checkOne = async (leaf: ServerLeaf) => {
+    setStatusById((p) => ({ ...p, [leaf.id]: "checking" }));
+    try {
+      const ok = await checkConnection(leaf.url, leaf.port);
+      setStatusById((p) => ({ ...p, [leaf.id]: ok ? "ok" : "error" }));
+    } catch {
+      setStatusById((p) => ({ ...p, [leaf.id]: "error" }));
+    }
   };
 
-  useEffect(() => {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentFiles));
-  }, [recentFiles]);
+  const checkAll = async (nodes: ServerNode[] = servers) => {
+    const leaves = walkLeaves(nodes);
+    await Promise.all(leaves.map(checkOne));
+  };
 
-  // --- Загрузка последнего файла при старте ---
-  useEffect(() => {
-    const path = initialPathRef.current;
-    (async () => {
-      if (path) {
-        try {
-          const text = await invoke<string>("read_file", { path });
-          const loaded = parseSettings(text);
-          applyLoadedServers(loaded);
-          addRecent(path);
-          return;
-        } catch (err) {
-          console.warn("Не удалось открыть последний файл настроек:", err);
-          localStorage.removeItem(FILE_KEY);
-          setCurrentFilePath(null);
-          removeRecent(path);
+  // --- add / edit ---
+  const openAdd = (kind: "folder" | "server", parentId: NodeId | null) => {
+    setEditState({
+      mode: "add",
+      kind,
+      parentId,
+      editingId: null,
+      initial: { kind, name: "", parentId, url: "localhost", port: 8080 },
+    });
+  };
+
+  const openEdit = (id: NodeId) => {
+    const node = findNode(servers, id);
+    if (!node) return;
+    const path = findPath(servers, id);
+    const parent = path.length > 1 ? path[path.length - 2] : null;
+    setEditState({
+      mode: "edit",
+      kind: node.kind,
+      parentId: parent?.id ?? null,
+      editingId: id,
+      initial: {
+        kind: node.kind,
+        name: node.name,
+        parentId: parent?.id ?? null,
+        url: isServer(node) ? node.url : "localhost",
+        port: isServer(node) ? node.port : 8080,
+      },
+    });
+  };
+
+  const saveEdit = (draft: ServerEditDraft) => {
+    if (!editState) return;
+
+    if (editState.mode === "add") {
+      const node: ServerNode =
+        draft.kind === "folder"
+          ? { id: makeId(), kind: "folder", name: draft.name, children: [] }
+          : {
+              id: makeId(),
+              kind: "server",
+              name: draft.name,
+              url: draft.url,
+              port: draft.port,
+            };
+      setServers((prev) => insertChild(prev, draft.parentId, node));
+      if (draft.parentId) expandParent(draft.parentId);
+      setSelectedId(node.id);
+    } else {
+      const id = editState.editingId!;
+      setServers((prev) => {
+        const currentPath = findPath(prev, id);
+        const currentParent =
+          currentPath.length > 1 ? currentPath[currentPath.length - 2] : null;
+        let next = updateNode(prev, id, {
+          name: draft.name,
+          ...(draft.kind === "server"
+            ? { url: draft.url, port: draft.port }
+            : {}),
+        } as Partial<ServerNode>);
+        if ((currentParent?.id ?? null) !== draft.parentId) {
+          next = moveNode(next, id, draft.parentId);
         }
+        return next;
+      });
+      if (draft.parentId) expandParent(draft.parentId);
+    }
+    setEditState(null);
+  };
+
+  // --- delete ---
+  const askDelete = (id: NodeId) => {
+    const node = findNode(servers, id);
+    if (!node) return;
+    const leafCount = isServer(node) ? 0 : walkLeaves([node]).length;
+    setConfirmDelete({ id, name: node.name, leafCount });
+  };
+
+  const doDelete = () => {
+    if (!confirmDelete) return;
+    const id = confirmDelete.id;
+    const next = removeNode(servers, id);
+    setServers(next);
+
+    setExpanded((prev) => {
+      const s = new Set(prev);
+      s.delete(id);
+      persistExpanded(s);
+      return s;
+    });
+
+    if (selectedId && !findNode(next, selectedId)) setSelectedId(null);
+
+    setStatusById((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+
+    setConfirmDelete(null);
+  };
+
+  // --- context menu ---
+  const openContext = (id: NodeId | null, x: number, y: number) => {
+    setCtxMenu({ x, y, targetId: id });
+  };
+
+  const contextItems = (): ContextMenuItem[] => {
+    if (!ctxMenu) return [];
+    const id = ctxMenu.targetId;
+    if (id === null) {
+      return [
+        { label: "Добавить сервер", onClick: () => openAdd("server", null) },
+        { label: "Добавить папку", onClick: () => openAdd("folder", null) },
+      ];
+    }
+    const node = findNode(servers, id);
+    if (!node) return [];
+    if (node.kind === "folder") {
+      return [
+        { label: "Добавить сервер", onClick: () => openAdd("server", id) },
+        { label: "Добавить папку", onClick: () => openAdd("folder", id) },
+        { label: "Переименовать", onClick: () => openEdit(id) },
+        { label: "Удалить", onClick: () => askDelete(id), danger: true },
+      ];
+    }
+    return [
+      { label: "Подключиться", onClick: () => void checkOne(node) },
+      { label: "Изменить", onClick: () => openEdit(id) },
+      { label: "Удалить", onClick: () => askDelete(id), danger: true },
+    ];
+  };
+
+  // --- config save/load ---
+  const saveConfig = async (forceDialog = false) => {
+    try {
+      let target = forceDialog ? null : settingsFilePath;
+      if (!target) {
+        const chosen = await save({
+          filters: [{ name: "JSON", extensions: ["json"] }],
+          defaultPath: "cuttlefish.json",
+        });
+        if (!chosen) return;
+        target = chosen;
       }
-      runChecks(INITIAL_SERVERS);
-    })();
+      const content = serializeSettings({ version: CURRENT_VERSION, servers });
+      await invoke("save_settings_file", { path: target, content });
+      setSettingsFilePath(target);
+      pushRecent(target);
+      setStatusText(`Сохранено: ${baseNameOf(target)}`);
+    } catch (e) {
+      setStatusText(`Ошибка сохранения: ${String(e)}`);
+    }
+  };
+
+  const loadConfig = async (path?: string) => {
+    try {
+      let target = path;
+      if (!target) {
+        const chosen = await open({
+          filters: [{ name: "JSON", extensions: ["json"] }],
+          multiple: false,
+        });
+        if (!chosen || Array.isArray(chosen)) return;
+        target = chosen;
+      }
+      const text = await invoke<string>("load_settings_file", { path: target });
+      const parsed = parseSettings(text);
+      setServers(parsed.servers);
+      setSettingsFilePath(target);
+      pushRecent(target);
+      setSelectedId(null);
+      setStatusText(`Загружено: ${baseNameOf(target)}`);
+      void checkAll(parsed.servers);
+    } catch (e) {
+      setStatusText(`Ошибка загрузки: ${String(e)}`);
+    }
+  };
+
+  const newConfig = () => {
+    setServers([]);
+    setSelectedId(null);
+    setSettingsFilePath(null);
+    setStatusText("Новый конфиг");
+  };
+
+  // --- sidebar resize ---
+  const draggingRef = useRef(false);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const w = Math.min(500, Math.max(160, e.clientX));
+      setSidebarWidth(w);
+      persistSidebarWidth(w);
+    };
+    const onUp = () => { draggingRef.current = false; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const startResize = () => { draggingRef.current = true; };
+
+  // --- initial check ---
+  useEffect(() => {
+    if (servers.length > 0) void checkAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // --- Сплиттер ---
-  useEffect(() => {
-    if (!isResizing) return;
-    const onMove = (e: MouseEvent) => {
-      setSidebarWidth(Math.min(Math.max(e.clientX, MIN_WIDTH), MAX_WIDTH));
-    };
-    const onUp = () => setIsResizing(false);
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    const prevCursor = document.body.style.cursor;
-    const prevSelect = document.body.style.userSelect;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    return () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      document.body.style.cursor = prevCursor;
-      document.body.style.userSelect = prevSelect;
-    };
-  }, [isResizing]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
-
-  // Заголовок окна всегда "Cuttlefish-UI"
-  useEffect(() => {
-    getCurrentWindow()
-      .setTitle("Cuttlefish-UI")
-      .catch((err) =>
-        console.warn("Не удалось установить заголовок окна:", err)
-      );
-  }, []);
-
-  // --- Перехват закрытия ---
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const appWindow = getCurrentWindow();
-        const fn = await appWindow.onCloseRequested(async (event) => {
-          if (bypassCloseCheck.current) return;
-          if (dirtyRef.current) {
-            event.preventDefault();
-            setPendingClose(true);
-          }
-        });
-        if (cancelled) fn();
-        else unlisten = fn;
-      } catch (err) {
-        console.warn("Не удалось подписаться на закрытие окна:", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
-
-  const handleCloseConfirm = async () => {
-    setPendingClose(false);
-    bypassCloseCheck.current = true;
-    try {
-      await getCurrentWindow().destroy();
-    } catch (err) {
-      console.error("Ошибка закрытия окна:", err);
-      bypassCloseCheck.current = false;
-    }
-  };
-
-  // --- Выход из меню «Файл» ---
-  const handleExit = async () => {
-    if (dirty) {
-      setPendingClose(true);
-      return;
-    }
-    try {
-      await getCurrentWindow().destroy();
-    } catch (err) {
-      console.error("Ошибка выхода из программы:", err);
-    }
-  };
-
-  // --- Файловые операции ---
-  const saveAs = async (): Promise<boolean> => {
-    try {
-      const path = await saveDialog({
-        title: "Сохранить файл настроек",
-        defaultPath: currentFilePath ?? "servers.json",
-        filters: [{ name: "JSON", extensions: ["json"] }],
-      });
-      if (!path || typeof path !== "string") return false;
-      await invoke("write_file", { path, content: serialize(servers) });
-      setCurrentFilePath(path);
-      localStorage.setItem(FILE_KEY, path);
-      setSavedServers(new Set(servers.map((s) => s.id)));
-      setDirty(false);
-      addRecent(path);
-      return true;
-    } catch (err) {
-      alert(`Не удалось сохранить файл: ${err}`);
-      return false;
-    }
-  };
-
-  const saveToCurrent = async (): Promise<boolean> => {
-    if (!currentFilePath) return saveAs();
-    try {
-      await invoke("write_file", {
-        path: currentFilePath,
-        content: serialize(servers),
-      });
-      setSavedServers(new Set(servers.map((s) => s.id)));
-      setDirty(false);
-      return true;
-    } catch (err) {
-      alert(`Не удалось сохранить файл: ${err}`);
-      return false;
-    }
-  };
-
-  const handleSaveAppSettings = (next: AppSettings) => {
-    setAppSettings(next);
-    saveAppSettings(next);
-    setAppSettingsOpen(false);
-  };
-
-  const handleNewFile = () => {
-    if (
-      dirty &&
-      !confirm(
-        "Есть несохранённые изменения. Создать новый файл без сохранения?"
-      )
-    ) {
-      return;
-    }
-    setServers([]);
-    setSavedServers(new Set());
-    setSelectedId(null);
-    setOpenTabs([]);
-    setActiveTab(null);
-    setActiveSubTabs({});
-    setConnectedIds(new Set());
-    setCheckStatuses({});
-    setCurrentFilePath(null);
-    localStorage.removeItem(FILE_KEY);
-    setDirty(false);
-  };
-
-  const handleOpenFile = async () => {
-    if (
-      dirty &&
-      !confirm(
-        "Есть несохранённые изменения. Открыть другой файл без сохранения?"
-      )
-    ) {
-      return;
-    }
-    try {
-      const path = await openDialog({
-        title: "Открыть файл настроек",
-        multiple: false,
-        filters: [{ name: "JSON", extensions: ["json"] }],
-      });
-      if (!path || typeof path !== "string") return;
-      const text = await invoke<string>("read_file", { path });
-      const loaded = parseSettings(text);
-      applyLoadedServers(loaded);
-      setCurrentFilePath(path);
-      localStorage.setItem(FILE_KEY, path);
-      addRecent(path);
-    } catch (err) {
-      alert(`Не удалось открыть файл: ${err}`);
-    }
-  };
-
-  const handleOpenRecent = async (path: string) => {
-    if (path === currentFilePath) return;
-    if (
-      dirty &&
-      !confirm(
-        "Есть несохранённые изменения. Открыть другой файл без сохранения?"
-      )
-    ) {
-      return;
-    }
-    try {
-      const text = await invoke<string>("read_file", { path });
-      const loaded = parseSettings(text);
-      applyLoadedServers(loaded);
-      setCurrentFilePath(path);
-      localStorage.setItem(FILE_KEY, path);
-      addRecent(path);
-    } catch (err) {
-      alert(`Не удалось открыть файл: ${err}`);
-      removeRecent(path);
-    }
-  };
-
-  // --- Вкладки ---
-  const openServerTab = (serverId: string) => {
-    setSelectedId(serverId);
-    setOpenTabs((prev) =>
-      prev.includes(serverId) ? prev : [...prev, serverId]
-    );
-    setActiveTab(serverId);
-  };
-
-  const closeTab = (serverId: string) => {
-    setOpenTabs((prev) => {
-      const next = prev.filter((id) => id !== serverId);
-      if (activeTab === serverId) {
-        const nextActive = next.length > 0 ? next[next.length - 1] : null;
-        setActiveTab(nextActive);
-        if (selectedId === serverId) setSelectedId(nextActive);
-      }
-      return next;
-    });
-  };
-
-  const handleAdd = () => {
-    const server = createServer();
-    setServers((prev) => [...prev, server]);
-    setSelectedId(server.id);
-    setOpenTabs((prev) => [...prev, server.id]);
-    setActiveTab(server.id);
-    setDirty(true);
-    runChecks([server]);
-  };
-
-  // --- Удаление ---
-  const handleDeleteClick = () => {
-    if (!selectedId) return;
-    const s = servers.find((x) => x.id === selectedId);
-    if (s) setPendingDelete(s);
-  };
-
-  const handleDeleteConfirm = () => {
-    const target = pendingDelete;
-    setPendingDelete(null);
-    if (!target) return;
-
-    const idx = servers.findIndex((s) => s.id === target.id);
-    const remaining = servers.filter((s) => s.id !== target.id);
-    const nextOpen = openTabs.filter((id) => id !== target.id);
-
-    setServers(remaining);
-    setOpenTabs(nextOpen);
-
-    setSavedServers((prev) => {
-      const next = new Set(prev);
-      next.delete(target.id);
-      return next;
-    });
-    setActiveSubTabs((prev) => {
-      const { [target.id]: _drop, ...rest } = prev;
-      return rest;
-    });
-    setCheckStatuses((prev) => {
-      const { [target.id]: _drop, ...rest } = prev;
-      return rest;
-    });
-    setConnectedIds((prev) => {
-      if (!prev.has(target.id)) return prev;
-      const next = new Set(prev);
-      next.delete(target.id);
-      return next;
-    });
-
-    if (activeTab === target.id) {
-      const nextActive =
-        nextOpen.length > 0 ? nextOpen[nextOpen.length - 1] : null;
-      setActiveTab(nextActive);
-      setSelectedId(nextActive);
-    } else {
-      setSelectedId(remaining[Math.min(idx, remaining.length - 1)]?.id ?? null);
-    }
-
-    setDirty(true);
-  };
-
-  // --- Настройка сервера ---
-  const handleServerChange = (serverId: string, patch: Partial<Server>) => {
-    setServers((prev) =>
-      prev.map((s) => (s.id === serverId ? { ...s, ...patch } : s))
-    );
-    setDirty(true);
-  };
-
-  const markUnsaved = (serverId: string) => {
-    setSavedServers((prev) => {
-      const next = new Set(prev);
-      next.delete(serverId);
-      return next;
-    });
-  };
-
-  const handleSaveServer = async (id: string) => {
-    const s = servers.find((x) => x.id === id);
-    const ok = await saveToCurrent();
-    if (ok && s) runChecks([s]);
-  };
-
-  // --- Обновить статусы ---
-  const handleRefresh = async () => {
-    if (servers.length === 0) return;
-    setRefreshing(true);
-    try {
-      await runChecks(servers);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // --- Подключение / отключение ---
-  const handleConnect = (serverId: string) => {
-    if (connectedIds.has(serverId)) return;
-    const server = servers.find((s) => s.id === serverId);
-    if (server) setAuthTarget(server);
-  };
-
-  const handleDisconnect = (serverId: string) => {
-    setConnectedIds((prev) => {
-      if (!prev.has(serverId)) return prev;
-      const next = new Set(prev);
-      next.delete(serverId);
-      return next;
-    });
-  };
-
-  const handleReconnect = (serverId: string) => {
-    setConnectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(serverId);
-      return next;
-    });
-    const server = servers.find((s) => s.id === serverId);
-    if (server) setAuthTarget(server);
-  };
-
-  const handleServerDoubleClick = (serverId: string) => {
-    // Уже подключён — двойной клик ничего не делает
-    if (connectedIds.has(serverId)) return;
-    handleConnect(serverId);
-  };
-
-  const handleAuthSubmit = () => {
-    if (!authTarget) return;
-    const id = authTarget.id;
-    setConnectedIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-    setAuthTarget(null);
-  };
-
-  const handleAuthCancel = () => setAuthTarget(null);
-
-  // --- Под-вкладки ---
-  const activeSubTab: TabId = activeTab
-    ? activeSubTabs[activeTab] ?? "settings"
-    : "settings";
-
-  const handleSubTabSelect = (tabId: TabId) => {
-    if (!activeTab) return;
-    setActiveSubTabs((prev) => ({ ...prev, [activeTab]: tabId }));
-  };
 
   return (
     <div className="app">
       <MenuBar
-        dirty={dirty}
-        recentFiles={recentFiles.filter((p) => p !== currentFilePath)}
-        currentFilePath={currentFilePath}
-        onNew={handleNewFile}
-        onOpen={handleOpenFile}
-        onSave={saveToCurrent}
-        onSaveAs={saveAs}
-        onOpenRecent={handleOpenRecent}
-        onExit={handleExit}
-        onAbout={() => setAboutOpen(true)}
-        onSettings={() => setAppSettingsOpen(true)}
+        onNew={newConfig}
+        onOpen={() => void loadConfig()}
+        onSave={() => void saveConfig(false)}
+        onSaveAs={() => void saveConfig(true)}
+        onCheckAll={() => void checkAll()}
+        onAbout={() => setShowAbout(true)}
+        onAuth={() => setShowAuth(true)}
+        onSettings={() => setShowSettings(true)}
+        recentFiles={recentFiles}
+        onOpenRecent={(p) => void loadConfig(p)}
+        statusText={statusText}
       />
-      <div className="body">
-        <div className="sidebar-wrap" style={{ width: sidebarWidth }}>
-          <Sidebar
-            servers={servers}
-            selectedId={selectedId}
-            connectedIds={connectedIds}
-            checkStatuses={checkStatuses}
-            refreshing={refreshing}
-            onSelect={openServerTab}
-            onDoubleClick={handleServerDoubleClick}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-            onReconnect={handleReconnect}
-            onAdd={handleAdd}
-            onDelete={handleDeleteClick}
-            onRefresh={handleRefresh}
-          />
-        </div>
-        <div
-          className={`splitter ${isResizing ? "active" : ""}`}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setIsResizing(true);
-          }}
-          role="separator"
-          aria-orientation="vertical"
+
+      <div className="app-body">
+        <Sidebar
+          width={sidebarWidth}
+          nodes={servers}
+          expanded={expanded}
+          selectedId={selectedId}
+          statusById={statusById}
+          onToggle={toggleExpand}
+          onSelect={(leaf) => setSelectedId(leaf.id)}
+          onContext={(id, x, y) => openContext(id, x, y)}
+          onRootContext={(x, y) => openContext(null, x, y)}
+          onAdd={() => openAdd("server", null)}
         />
-        <TabsPanel
-          servers={servers}
-          subTabs={SETTINGS_TABS}
-          openTabs={openTabs}
-          activeTab={activeTab}
-          activeSubTab={activeSubTab}
-          connectedIds={connectedIds}
-          savedServers={savedServers}
-          onTabSelect={openServerTab}
-          onTabClose={closeTab}
-          onSubTabSelect={handleSubTabSelect}
-          onChange={handleServerChange}
-          onSave={handleSaveServer}
-          onEdit={markUnsaved}
-        />
+        <div className="resizer" onMouseDown={startResize} />
+
+        <main className="main-area">
+          {breadcrumbs.length > 0 && (
+            <div className="breadcrumbs">
+              {breadcrumbs.map((n, i) => (
+                <span key={n.id} className="breadcrumb-item">
+                  {i > 0 && <span className="breadcrumb-sep"> / </span>}
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setSelectedId(n.id);
+                    }}
+                  >
+                    {n.name}
+                  </a>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {selectedLeaf ? (
+            <TabsPanel
+              tabs={SETTINGS_TABS}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              server={selectedLeaf}
+              status={statusById[selectedLeaf.id] ?? "idle"}
+              onRecheck={() => void checkOne(selectedLeaf)}
+            />
+          ) : (
+            <div className="placeholder">
+              {selectedNode && selectedNode.kind === "folder"
+                ? `Папка «${selectedNode.name}» — выберите сервер`
+                : "Выберите сервер в списке слева"}
+            </div>
+          )}
+        </main>
       </div>
 
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title="Удаление сервера"
-        message={
-          pendingDelete
-            ? `Точно удалить «${pendingDelete.name || "(без имени)"}»?`
-            : ""
-        }
-        confirmLabel="Да"
-        cancelLabel="Отмена"
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => setPendingDelete(null)}
-      />
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={contextItems()}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
 
-      <ConfirmDialog
-        open={pendingClose}
-        title="Несохранённые изменения"
-        message="Есть несохранённые настройки сервера. Закрыть программу?"
-        confirmLabel="Да"
-        cancelLabel="Нет"
-        onConfirm={handleCloseConfirm}
-        onCancel={() => setPendingClose(false)}
-      />
+      {editState && (
+        <ServerEditDialog
+          servers={servers}
+          mode={editState.mode}
+          initial={editState.initial}
+          editingId={editState.editingId}
+          onSave={saveEdit}
+          onCancel={() => setEditState(null)}
+        />
+      )}
 
-      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
-      
-      <SettingsDialog
-        open={appSettingsOpen}
-        settings={appSettings}
-        onSave={handleSaveAppSettings}
-        onClose={() => setAppSettingsOpen(false)}
-      />
-      
-      <AuthDialog
-        open={authTarget !== null}
-        serverName={authTarget?.name || "(без имени)"}
-        onSubmit={handleAuthSubmit}
-        onCancel={handleAuthCancel}
-      />
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Удаление"
+          message={
+            confirmDelete.leafCount > 0
+              ? `Удалить «${confirmDelete.name}» вместе с ${confirmDelete.leafCount} сервер(ами)?`
+              : `Удалить «${confirmDelete.name}»?`
+          }
+          confirmLabel="Удалить"
+          danger
+          onConfirm={doDelete}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      {showAuth && <AuthDialog onClose={() => setShowAuth(false)} />}
+      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
-
-export default App;

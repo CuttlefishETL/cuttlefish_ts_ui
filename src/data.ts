@@ -1,23 +1,35 @@
-import type { Server, SubTab } from "./types";
+import { ServerNode, TabId } from "./types";
 
-export const SETTINGS_TABS: SubTab[] = [
-  { id: "settings", name: "Настройка" },
-  { id: "connectors", name: "Коннекторы" },
-  { id: "plugins", name: "Плагины" },
-  { id: "metrics", name: "Метрики" },
-  { id: "scripts", name: "Scripts" },
-];
-
-export const INITIAL_SERVERS: Server[] = [
-  { id: "server1", name: "Сервер 1", url: "http://localhost", port: 8080 },
-  { id: "server2", name: "Сервер 2", url: "http://localhost", port: 8081 },
-];
-
-export function createServer(): Server {
-  return {
-    id: `server-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    name: "Новый сервер",
-    url: "http://localhost",
-    port: 8080,
-  };
+export interface TabDef {
+  id: TabId;
+  label: string;
 }
+
+export const SETTINGS_TABS: TabDef[] = [
+  { id: "settings", label: "Настройки" },
+  { id: "connectors", label: "Коннекторы" },
+  { id: "plugins", label: "Плагины" },
+  { id: "metrics", label: "Метрики" },
+  { id: "scripts", label: "Скрипты" },
+];
+
+export const INITIAL_SERVERS: ServerNode[] = [
+  {
+    id: "folder-prod",
+    kind: "folder",
+    name: "Production",
+    children: [
+      { id: "srv-prod-eu", kind: "server", name: "prod-eu", url: "etl-eu.example.com", port: 8080 },
+      { id: "srv-prod-us", kind: "server", name: "prod-us", url: "etl-us.example.com", port: 8080 },
+    ],
+  },
+  {
+    id: "folder-stage",
+    kind: "folder",
+    name: "Staging",
+    children: [
+      { id: "srv-stage", kind: "server", name: "stage", url: "localhost", port: 8081 },
+    ],
+  },
+  { id: "srv-local", kind: "server", name: "Local dev", url: "localhost", port: 8080 },
+];

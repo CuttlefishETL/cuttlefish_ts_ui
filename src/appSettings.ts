@@ -1,40 +1,61 @@
-export interface AppSettings {
-  /** Автоматически отправлять скрипт на сервер при запуске отладки */
-  autoSendScriptOnRun: boolean;
-  /** Период опроса health серверов, секунды */
-  healthPollIntervalSec: number;
-}
+import { AppSettings, ServerNode } from "./types";
 
-const KEY = "app-settings";
+export const CURRENT_VERSION = 2;
 
-export const MIN_HEALTH_INTERVAL = 1;
-export const MAX_HEALTH_INTERVAL = 3600;
+const makeId = () =>
+  crypto.randomUUID?.() ??
+  `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-export const DEFAULT_APP_SETTINGS: AppSettings = {
-  autoSendScriptOnRun: false,
-  healthPollIntervalSec: 30,
-};
+function normalizeNode(raw: any, seen: Set<string>): ServerNode | null {
+  if (!raw || typeof raw !== "object") return null;
 
-export function loadAppSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT_APP_SETTINGS };
-    const parsed = JSON.parse(raw);
-    const n = Number(parsed.healthPollIntervalSec);
-    return {
-      autoSendScriptOnRun: !!parsed.autoSendScriptOnRun,
-      healthPollIntervalSec: Number.isFinite(n)
-        ? Math.min(
-            MAX_HEALTH_INTERVAL,
-            Math.max(MIN_HEALTH_INTERVAL, Math.floor(n))
-          )
-        : DEFAULT_APP_SETTINGS.healthPollIntervalSec,
-    };
-  } catch {
-    return { ...DEFAULT_APP_SETTINGS };
+  let id = typeof raw.id === "string" && raw.id ? raw.id : makeId();
+  if (seen.has(id)) id = makeId();
+  seen.add(id);
+
+  const name =
+    typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : "Unnamed";
+
+  const rawChildren = Array.isArray(raw.children) ? raw.children : null;
+  const looksLikeFolder = raw.kind === "folder" || rawChildren !== null;
+
+  if (looksLikeFolder) {
+    const children: ServerNode[] = (rawChildren ?? [])
+      .map((c: any) => normalizeNode(c, seen))
+      .filter((c: ServerNode | null): c is ServerNode => c !== null);
+    return { id, name, kind: "folder", children };
   }
+
+  return {
+    id,
+    name,
+    kind: "server",
+    url: typeof raw.url === "string" && raw.url ? raw.url : "localhost",
+    port: Number.isFinite(Number(raw.port)) ? Number(raw.port) : 8080,
+  };
 }
 
-export function saveAppSettings(s: AppSettings) {
-  localStorage.setItem(KEY, JSON.stringify(s));
+export function parseSettings(text: string): AppSettings {
+  const raw = JSON.parse(text);
+
+  if (raw?.version !== undefined && raw.version !== 1 && raw.version !== 2) {
+    throw new Error(`Unsupported config version: ${raw.version}`);
+  }
+
+  const seen = new Set<string>();
+  const servers: ServerNode[] = Array.isArray(raw?.servers)
+    ? raw.servers
+        .map((n: any) => normalizeNode(n, seen))
+        .filter((n: ServerNode | null): n is ServerNode => n !== null)
+    : [];
+
+  return { version: CURRENT_VERSION, servers };
+}
+
+export function serializeSettings(s: AppSettings): string {
+  return JSON.stringify(
+    { version: CURRENT_VERSION, servers: s.servers },
+    null,
+    2,
+  );
 }

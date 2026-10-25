@@ -1,46 +1,28 @@
-import { useEffect } from "react";
-
-interface ConfirmDialogProps {
-  open: boolean;
+interface Props {
   title: string;
   message: string;
   confirmLabel?: string;
-  cancelLabel?: string;
+  danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 export function ConfirmDialog({
-  open,
   title,
   message,
-  confirmLabel = "Да",
-  cancelLabel = "Отмена",
+  confirmLabel = "OK",
+  danger,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-      if (e.key === "Enter") onConfirm();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onCancel, onConfirm]);
-
-  if (!open) return null;
-
+}: Props) {
   return (
-    <div className="modal-backdrop" onMouseDown={onCancel}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="dialog-backdrop">
+      <div className="dialog" role="alertdialog" aria-modal="true">
         <h3>{title}</h3>
         <p>{message}</p>
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onCancel}>
-            {cancelLabel}
-          </button>
-          <button type="button" className="btn danger" onClick={onConfirm}>
+        <div className="dialog-actions">
+          <button onClick={onCancel}>Отмена</button>
+          <button className={danger ? "danger" : "primary"} onClick={onConfirm}>
             {confirmLabel}
           </button>
         </div>
