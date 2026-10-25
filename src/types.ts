@@ -22,7 +22,11 @@ export interface ServerFolder extends BaseNode {
 
 export type ServerNode = ServerFolder | ServerLeaf;
 
-export interface AppSettings {
-  version: number;
-  servers: ServerNode[];
+/** Alias для TabsPanel и SettingsTab. */
+export type Server = ServerLeaf;
+
+/** Описание под-вкладки. */
+export interface SubTab {
+  id: TabId;
+  name: string;
 }

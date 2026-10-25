@@ -1918,3 +1918,43 @@ body,
   min-width: 0;
   overflow: auto;
 }
+
+
+/* ===== Дерево серверов ===== */
+.server-chevron {
+  width: 12px;
+  text-align: center;
+  color: #666;
+  flex-shrink: 0;
+  font-size: 10px;
+  user-select: none;
+}
+
+/* ===== Drag & Drop ===== */
+.server-item {
+  -webkit-user-drag: element;
+}
+
+.server-item.dragging {
+  opacity: 0.5;
+}
+
+.server-item.drag-over {
+  background-color: #d3e2ff;
+  outline: 1px dashed #396cd8;
+  outline-offset: -1px;
+}
+
+.server-list.drag-over {
+  background-color: #eef3ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .server-item.drag-over {
+    background-color: #2a3a5a;
+    outline-color: #6f8cff;
+  }
+  .server-list.drag-over {
+    background-color: #232a3a;
+  }
+}

@@ -1,16 +1,11 @@
-import { ServerNode, TabId } from "./types";
+import type { ServerFolder, ServerLeaf, ServerNode, SubTab } from "./types";
 
-export interface TabDef {
-  id: TabId;
-  label: string;
-}
-
-export const SETTINGS_TABS: TabDef[] = [
-  { id: "settings", label: "Настройки" },
-  { id: "connectors", label: "Коннекторы" },
-  { id: "plugins", label: "Плагины" },
-  { id: "metrics", label: "Метрики" },
-  { id: "scripts", label: "Скрипты" },
+export const SETTINGS_TABS: SubTab[] = [
+  { id: "settings", name: "Настройка" },
+  { id: "connectors", name: "Коннекторы" },
+  { id: "plugins", name: "Плагины" },
+  { id: "metrics", name: "Метрики" },
+  { id: "scripts", name: "Scripts" },
 ];
 
 export const INITIAL_SERVERS: ServerNode[] = [
@@ -19,17 +14,35 @@ export const INITIAL_SERVERS: ServerNode[] = [
     kind: "folder",
     name: "Production",
     children: [
-      { id: "srv-prod-eu", kind: "server", name: "prod-eu", url: "etl-eu.example.com", port: 8080 },
-      { id: "srv-prod-us", kind: "server", name: "prod-us", url: "etl-us.example.com", port: 8080 },
+      { id: "server1", kind: "server", name: "Сервер 1", url: "http://localhost", port: 8080 },
+      { id: "server2", kind: "server", name: "Сервер 2", url: "http://localhost", port: 8081 },
     ],
   },
   {
-    id: "folder-stage",
+    id: "folder-dev",
     kind: "folder",
-    name: "Staging",
+    name: "Development",
     children: [
-      { id: "srv-stage", kind: "server", name: "stage", url: "localhost", port: 8081 },
+      { id: "server3", kind: "server", name: "Сервер 3", url: "http://localhost", port: 8082 },
     ],
   },
-  { id: "srv-local", kind: "server", name: "Local dev", url: "localhost", port: 8080 },
 ];
+
+export function createServer(): ServerLeaf {
+  return {
+    id: `server-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    kind: "server",
+    name: "Новый сервер",
+    url: "http://localhost",
+    port: 8080,
+  };
+}
+
+export function createFolder(): ServerFolder {
+  return {
+    id: `folder-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    kind: "folder",
+    name: "Новая папка",
+    children: [],
+  };
+}

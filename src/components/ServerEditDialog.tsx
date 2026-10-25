@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NodeId, ServerNode } from "../types";
-import { findNode, isDescendant, isServer, listFolders } from "../treeUtils";
+import { findNodeById, isFolder } from "../treeUtils";
 
 export interface ServerEditDraft {
   kind: "folder" | "server";
@@ -17,6 +17,29 @@ interface Props {
   editingId: NodeId | null;
   onSave: (draft: ServerEditDraft) => void;
   onCancel: () => void;
+}
+
+function listFolders(
+  nodes: ServerNode[],
+  depth = 0,
+): Array<{ id: NodeId; name: string; depth: number }> {
+  const out: Array<{ id: NodeId; name: string; depth: number }> = [];
+  for (const n of nodes) {
+    if (isFolder(n)) {
+      out.push({ id: n.id, name: n.name, depth });
+      out.push(...listFolders(n.children, depth + 1));
+    }
+  }
+  return out;
+}
+
+function isDescendant(
+  nodes: ServerNode[],
+  ancestorId: NodeId,
+  id: NodeId,
+): boolean {
+  const anc = findNodeById(nodes, ancestorId);
+  return !!anc && isFolder(anc) && findNodeById(anc.children, id) !== null;
 }
 
 export function ServerEditDialog({
@@ -42,8 +65,8 @@ export function ServerEditDialog({
 
   const siblings: ServerNode[] = useMemo(() => {
     if (draft.parentId === null) return servers;
-    const parent = findNode(servers, draft.parentId);
-    return parent && !isServer(parent) ? parent.children : [];
+    const parent = findNodeById(servers, draft.parentId);
+    return parent && isFolder(parent) ? parent.children : [];
   }, [servers, draft.parentId]);
 
   const submit = () => {
@@ -55,7 +78,8 @@ export function ServerEditDialog({
     }
     if (
       siblings.some(
-        (s) => s.name.toLowerCase() === name.toLowerCase() && s.id !== editingId,
+        (s) =>
+          s.name.toLowerCase() === name.toLowerCase() && s.id !== editingId,
       )
     ) {
       setError("Имя уже используется в этом родителе");
@@ -66,7 +90,11 @@ export function ServerEditDialog({
         setError("URL не может быть пустым");
         return;
       }
-      if (!Number.isInteger(draft.port) || draft.port < 1 || draft.port > 65535) {
+      if (
+        !Number.isInteger(draft.port) ||
+        draft.port < 1 ||
+        draft.port > 65535
+      ) {
         setError("Порт должен быть целым числом от 1 до 65535");
         return;
       }
@@ -85,7 +113,10 @@ export function ServerEditDialog({
             value={draft.kind}
             disabled={mode === "edit"}
             onChange={(e) =>
-              setDraft({ ...draft, kind: e.target.value as "folder" | "server" })
+              setDraft({
+                ...draft,
+                kind: e.target.value as "folder" | "server",
+              })
             }
           >
             <option value="server">Сервер</option>
