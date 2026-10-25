@@ -427,6 +427,12 @@ body,
   margin-top: 0;
 }
 
+/* Вкладка Scripts занимает всю площадь без отступов родителя */
+.sub-tab-content:has(.scripts-tab) {
+  padding: 0;
+  overflow: hidden;
+}
+
 /* ===== Пустые состояния ===== */
 .empty-state {
   flex: 1;
@@ -627,6 +633,39 @@ body,
   min-width: 100px;
   color: #666;
   font-weight: 500;
+}
+
+/* ===== Диалог «Настройка программы» ===== */
+.app-settings-modal {
+  min-width: 440px;
+  max-width: 560px;
+}
+
+.app-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.app-settings-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.app-settings-checkbox input[type="checkbox"] {
+  margin-top: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.app-settings-checkbox span {
+  flex: 1;
 }
 
 /* ===== Контекстное меню ===== */
@@ -947,6 +986,8 @@ body,
 }
 
 .debug-panel-header {
+  display: flex;
+  align-items: center;
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
@@ -956,6 +997,18 @@ body,
   border-bottom: 1px solid #ccc;
   background-color: #e8e8e8;
   flex-shrink: 0;
+}
+
+.debug-panel-count {
+  margin-left: 6px;
+  background-color: #d02020;
+  color: #ffffff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.3;
 }
 
 .debug-panel-body {
@@ -1043,6 +1096,148 @@ body,
   flex-shrink: 0;
 }
 
+/* ===== Панель Breakpoints — дерево ===== */
+.bp-tree-body {
+  padding: 4px 0;
+}
+
+.bp-tree-folder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bp-tree-folder:hover {
+  background-color: #e4e4e4;
+}
+
+.bp-tree-chevron {
+  width: 12px;
+  text-align: center;
+  color: #666;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.bp-tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-tree-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 0;
+  user-select: none;
+  color: #333;
+}
+
+.bp-tree-file-count {
+  flex-shrink: 0;
+  background-color: #d02020;
+  color: #ffffff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.bp-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.bp-header-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: #666;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 3px;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+.bp-header-btn:hover:not(:disabled) {
+  background-color: #ddd;
+  color: #222;
+}
+
+.bp-header-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bp-header-btn.danger:hover:not(:disabled) {
+  background-color: #fce4e4;
+  color: #d02020;
+}
+
+.bp-tree-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 0;
+  cursor: pointer;
+  border-radius: 3px;
+  color: #333;
+}
+
+.bp-tree-line:hover {
+  background-color: #e4e4e4;
+}
+
+.bp-tree-line-dot {
+  color: #d02020;
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.bp-tree-line.disabled .bp-tree-line-text {
+  color: #999;
+}
+
+.bp-tree-line.disabled .bp-tree-line-dot {
+  color: #d02020;
+  opacity: 0.4;
+}
+
+.bp-tree-line-text {
+  flex: 1;
+  font-size: 12px;
+}
+
+.bp-tree-remove {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: none;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.bp-tree-remove:hover {
+  color: #d02020;
+  background-color: rgba(208, 32, 32, 0.1);
+}
+
 /* ===== Гуттер точек останова ===== */
 .cm-breakpoint-gutter {
   width: 14px;
@@ -1061,42 +1256,9 @@ body,
   line-height: 1;
 }
 
-/* Вкладка Scripts занимает всю площадь без отступов родителя */
-.sub-tab-content:has(.scripts-tab) {
-  padding: 0;
-}
-
-/* ===== Диалог «Настройка программы» ===== */
-.app-settings-modal {
-  min-width: 440px;
-  max-width: 560px;
-}
-
-.app-settings-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.app-settings-checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.app-settings-checkbox input[type="checkbox"] {
-  margin-top: 2px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.app-settings-checkbox span {
-  flex: 1;
+.cm-breakpoint-dot.disabled {
+  color: #d02020;
+  opacity: 0.5;
 }
 
 /* ===================================================================
@@ -1387,5 +1549,50 @@ body,
 
   .var-type {
     color: #888;
+  }
+
+  /* ===== Breakpoints (дерево) — тёмная тема ===== */
+  .bp-tree-folder:hover,
+  .bp-tree-line:hover {
+    background-color: #333;
+  }
+
+  .bp-tree-chevron {
+    color: #999;
+  }
+
+  .bp-tree-file {
+    color: #ddd;
+  }
+
+  .bp-tree-line {
+    color: #ddd;
+  }
+
+  .bp-tree-remove {
+    color: #666;
+  }
+
+  .bp-tree-remove:hover {
+    color: #ff6060;
+    background-color: rgba(255, 96, 96, 0.15);
+  }
+
+  .bp-header-btn {
+    color: #aaa;
+  }
+
+  .bp-header-btn:hover:not(:disabled) {
+    background-color: #444;
+    color: #fff;
+  }
+
+  .bp-header-btn.danger:hover:not(:disabled) {
+    background-color: #4a2020;
+    color: #ff8080;
+  }
+
+  .bp-tree-line.disabled .bp-tree-line-text {
+    color: #666;
   }
 }

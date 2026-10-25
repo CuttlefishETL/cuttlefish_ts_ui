@@ -1,20 +1,22 @@
 import { StateField, StateEffect } from "@codemirror/state";
 import { gutter, GutterMarker, EditorView, keymap } from "@codemirror/view";
 
-export const toggleBreakpointEffect = StateEffect.define<number>();
-export const setBreakpointsEffect = StateEffect.define<number[]>();
+export type BreakpointMap = Map<number, boolean>;
 
-export const breakpointField = StateField.define<Set<number>>({
-  create: () => new Set(),
+export const toggleBreakpointEffect = StateEffect.define<number>();
+export const setBreakpointsEffect = StateEffect.define<[number, boolean][]>();
+
+export const breakpointField = StateField.define<BreakpointMap>({
+  create: () => new Map(),
   update(value, tr) {
     for (const effect of tr.effects) {
       if (effect.is(setBreakpointsEffect)) {
-        return new Set(effect.value);
+        return new Map(effect.value);
       }
       if (effect.is(toggleBreakpointEffect)) {
-        const next = new Set(value);
+        const next = new Map(value);
         if (next.has(effect.value)) next.delete(effect.value);
-        else next.add(effect.value);
+        else next.set(effect.value, true);
         return next;
       }
     }
@@ -22,24 +24,34 @@ export const breakpointField = StateField.define<Set<number>>({
   },
 });
 
-const breakpointMarker = new (class extends GutterMarker {
+class EnabledMarker extends GutterMarker {
   toDOM() {
     const dot = document.createElement("span");
     dot.className = "cm-breakpoint-dot";
     dot.textContent = "●";
     return dot;
   }
-})();
+}
+class DisabledMarker extends GutterMarker {
+  toDOM() {
+    const dot = document.createElement("span");
+    dot.className = "cm-breakpoint-dot disabled";
+    dot.textContent = "○";
+    return dot;
+  }
+}
+const enabledMarker = new EnabledMarker();
+const disabledMarker = new DisabledMarker();
 
 export const breakpointGutter = gutter({
   class: "cm-breakpoint-gutter",
   lineMarker: (view, line) => {
     const lineNo = view.state.doc.lineAt(line.from).number;
-    return view.state.field(breakpointField).has(lineNo)
-      ? breakpointMarker
-      : null;
+    const bp = view.state.field(breakpointField);
+    if (!bp.has(lineNo)) return null;
+    return bp.get(lineNo) ? enabledMarker : disabledMarker;
   },
-  initialSpacer: () => breakpointMarker,
+  initialSpacer: () => enabledMarker,
   domEventHandlers: {
     mousedown: (view, line) => {
       const lineNo = view.state.doc.lineAt(line.from).number;
@@ -67,14 +79,20 @@ export const breakpointTheme = EditorView.baseTheme({
     fontSize: "12px",
     lineHeight: "1",
   },
+  ".cm-breakpoint-dot.disabled": {
+    color: "#d02020",
+    opacity: "0.5",
+  },
 });
 
-export function getBreakpoints(view: EditorView): Set<number> {
+export function getBreakpoints(view: EditorView): BreakpointMap {
   return view.state.field(breakpointField);
 }
 
-export function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+export function mapsEqual(a: BreakpointMap, b: BreakpointMap): boolean {
   if (a.size !== b.size) return false;
-  for (const x of a) if (!b.has(x)) return false;
+  for (const [k, v] of a) {
+    if (!b.has(k) || b.get(k) !== v) return false;
+  }
   return true;
 }

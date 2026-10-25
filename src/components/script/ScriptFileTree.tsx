@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { ScriptFileNode } from "../../scriptStub";
+import type { BreakpointMap } from "./breakpointField";
 
 interface ScriptFileTreeProps {
   nodes: ScriptFileNode[];
   activePath: string | null;
-  breakpointsByFile: Record<string, Set<number>>;
+  breakpointsByFile: Record<string, BreakpointMap>;
   onOpen: (path: string) => void;
 }
 
@@ -32,7 +33,7 @@ export function ScriptFileTree({
 
 function countBreakpoints(
   node: ScriptFileNode,
-  breakpointsByFile: Record<string, Set<number>>
+  breakpointsByFile: Record<string, BreakpointMap>
 ): number {
   if (node.type === "file") {
     return breakpointsByFile[node.path]?.size ?? 0;
@@ -53,7 +54,7 @@ function TreeNode({
   node: ScriptFileNode;
   depth: number;
   activePath: string | null;
-  breakpointsByFile: Record<string, Set<number>>;
+  breakpointsByFile: Record<string, BreakpointMap>;
   onOpen: (path: string) => void;
 }) {
   const [open, setOpen] = useState(true);

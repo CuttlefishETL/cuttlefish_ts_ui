@@ -9,9 +9,10 @@ import {
   breakpointKeymap,
   breakpointTheme,
   getBreakpoints,
+  mapsEqual,
   setBreakpointsEffect,
   toggleBreakpointEffect,
-  setsEqual,
+  type BreakpointMap,
 } from "./breakpointField";
 
 interface OpenFile {
@@ -20,26 +21,35 @@ interface OpenFile {
   content: string;
 }
 
+interface PendingScroll {
+  path: string;
+  line: number;
+}
+
 interface ScriptEditorTabsProps {
   openFiles: OpenFile[];
   activePath: string | null;
-  breakpointsByFile: Record<string, Set<number>>;
+  breakpointsByFile: Record<string, BreakpointMap>;
+  pendingScroll: PendingScroll | null;
   onActivate: (path: string) => void;
   onClose: (path: string) => void;
   onChange: (path: string, content: string) => void;
-  onBreakpointsChange: (path: string, bps: Set<number>) => void;
+  onBreakpointsChange: (path: string, bps: BreakpointMap) => void;
+  onScrollHandled: () => void;
 }
 
-const EMPTY_SET: Set<number> = new Set();
+const EMPTY_MAP: BreakpointMap = new Map();
 
 export function ScriptEditorTabs({
   openFiles,
   activePath,
   breakpointsByFile,
+  pendingScroll,
   onActivate,
   onClose,
   onChange,
   onBreakpointsChange,
+  onScrollHandled,
 }: ScriptEditorTabsProps) {
   const activeFile = openFiles.find((f) => f.path === activePath);
 
@@ -77,12 +87,14 @@ export function ScriptEditorTabs({
           <ScriptEditor
             key={file.path}
             file={file}
-            breakpoints={breakpointsByFile[file.path] ?? EMPTY_SET}
+            breakpoints={breakpointsByFile[file.path] ?? EMPTY_MAP}
             visible={activePath === file.path}
+            pendingScroll={pendingScroll}
             onChange={(content) => onChange(file.path, content)}
             onBreakpointsChange={(bps) =>
               onBreakpointsChange(file.path, bps)
             }
+            onScrollHandled={onScrollHandled}
           />
         ))}
         {!activeFile && openFiles.length === 0 && (
@@ -97,14 +109,18 @@ function ScriptEditor({
   file,
   breakpoints,
   visible,
+  pendingScroll,
   onChange,
   onBreakpointsChange,
+  onScrollHandled,
 }: {
   file: OpenFile;
-  breakpoints: Set<number>;
+  breakpoints: BreakpointMap;
   visible: boolean;
+  pendingScroll: PendingScroll | null;
   onChange: (content: string) => void;
-  onBreakpointsChange: (bps: Set<number>) => void;
+  onBreakpointsChange: (bps: BreakpointMap) => void;
+  onScrollHandled: () => void;
 }) {
   const [isDark, setIsDark] = useState(
     () =>
@@ -121,6 +137,8 @@ function ScriptEditor({
   }, []);
 
   const viewRef = useRef<EditorView | null>(null);
+  const [viewReady, setViewReady] = useState(false);
+
   const breakpointsRef = useRef(breakpoints);
   breakpointsRef.current = breakpoints;
 
@@ -131,23 +149,40 @@ function ScriptEditor({
     viewRef.current = view;
     if (breakpointsRef.current.size > 0) {
       view.dispatch({
-        effects: setBreakpointsEffect.of([...breakpointsRef.current]),
+        effects: setBreakpointsEffect.of([
+          ...breakpointsRef.current.entries(),
+        ]),
       });
     }
+    setViewReady(true);
   }, []);
 
-  // Внешние изменения брейкпоинтов → StateField
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
     const current = view.state.field(breakpointField);
-    if (setsEqual(current, breakpoints)) return;
+    if (mapsEqual(current, breakpoints)) return;
     view.dispatch({
-      effects: setBreakpointsEffect.of([...breakpoints]),
+      effects: setBreakpointsEffect.of([...breakpoints.entries()]),
     });
   }, [breakpoints]);
 
-  // StateField меняется (клик по гуттеру / F9) → сообщаем наружу
+  useEffect(() => {
+    if (!viewReady) return;
+    if (!pendingScroll || pendingScroll.path !== file.path) return;
+    const view = viewRef.current;
+    if (!view) return;
+    const total = view.state.doc.lines;
+    const line = Math.min(Math.max(1, pendingScroll.line), total);
+    const pos = view.state.doc.line(line).from;
+    view.dispatch({
+      selection: { anchor: pos },
+      effects: EditorView.scrollIntoView(pos, { y: "center" }),
+    });
+    view.focus();
+    onScrollHandled();
+  }, [viewReady, pendingScroll, file.path, onScrollHandled]);
+
   const extensions = useMemo(
     () => [
       StreamLanguage.define(lua),

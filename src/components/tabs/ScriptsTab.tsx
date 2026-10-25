@@ -4,6 +4,7 @@ import { ScriptFileTree } from "../script/ScriptFileTree";
 import { ScriptEditorTabs } from "../script/ScriptEditorTabs";
 import { DebugPanels } from "../script/DebugPanels";
 import { Splitter } from "../script/Splitter";
+import type { BreakpointMap } from "../script/breakpointField";
 import {
   STUB_FILES,
   getFileContent,
@@ -34,8 +35,12 @@ export function ScriptsTab() {
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [breakpointsByFile, setBreakpointsByFile] = useState<
-    Record<string, Set<number>>
+    Record<string, BreakpointMap>
   >({});
+  const [pendingScroll, setPendingScroll] = useState<{
+    path: string;
+    line: number;
+  } | null>(null);
 
   const [treeWidth, setTreeWidth] = useState(220);
   const [topPercent, setTopPercent] = useState(55);
@@ -74,9 +79,86 @@ export function ScriptsTab() {
   );
 
   const changeBreakpoints = useCallback(
-    (path: string, bps: Set<number>) => {
+    (path: string, bps: BreakpointMap) => {
       setBreakpointsByFile((prev) => ({ ...prev, [path]: bps }));
     },
+    []
+  );
+
+  const removeBreakpoint = useCallback((path: string, line: number) => {
+    setBreakpointsByFile((prev) => {
+      const cur = prev[path];
+      if (!cur || !cur.has(line)) return prev;
+      const next = new Map(cur);
+      next.delete(line);
+      return { ...prev, [path]: next };
+    });
+  }, []);
+
+  const deleteAllBreakpoints = useCallback(() => {
+    setBreakpointsByFile({});
+  }, []);
+
+  const setAllEnabled = useCallback((enabled: boolean) => {
+    setBreakpointsByFile((prev) => {
+      const next: Record<string, BreakpointMap> = {};
+      for (const [path, map] of Object.entries(prev)) {
+        const newMap = new Map<number, boolean>();
+        for (const line of map.keys()) newMap.set(line, enabled);
+        next[path] = newMap;
+      }
+      return next;
+    });
+  }, []);
+
+  const setNodeEnabled = useCallback(
+    (
+      targetPath: string,
+      isFolder: boolean,
+      enabled: boolean,
+      line?: number
+    ) => {
+      setBreakpointsByFile((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [filePath, map] of Object.entries(prev)) {
+          const matches = isFolder
+            ? filePath.startsWith(targetPath + "/")
+            : filePath === targetPath;
+          if (!matches) continue;
+
+          const newMap = new Map(map);
+          if (line !== undefined) {
+            if (newMap.has(line)) {
+              newMap.set(line, enabled);
+              changed = true;
+            }
+          } else {
+            for (const l of newMap.keys()) {
+              if (newMap.get(l) !== enabled) {
+                newMap.set(l, enabled);
+                changed = true;
+              }
+            }
+          }
+          next[filePath] = newMap;
+        }
+        return changed ? next : prev;
+      });
+    },
+    []
+  );
+
+  const navigateToBreakpoint = useCallback(
+    (path: string, line: number) => {
+      openFile(path);
+      setPendingScroll({ path, line });
+    },
+    [openFile]
+  );
+
+  const clearPendingScroll = useCallback(
+    () => setPendingScroll(null),
     []
   );
 
@@ -126,10 +208,12 @@ export function ScriptsTab() {
               openFiles={openFiles}
               activePath={activePath}
               breakpointsByFile={breakpointsByFile}
+              pendingScroll={pendingScroll}
               onActivate={setActivePath}
               onClose={closeFile}
               onChange={changeFileContent}
               onBreakpointsChange={changeBreakpoints}
+              onScrollHandled={clearPendingScroll}
             />
           </div>
         </div>
@@ -140,7 +224,14 @@ export function ScriptsTab() {
         />
 
         <div className="scripts-bottom">
-          <DebugPanels />
+          <DebugPanels
+            breakpointsByFile={breakpointsByFile}
+            onNavigateBreakpoint={navigateToBreakpoint}
+            onRemoveBreakpoint={removeBreakpoint}
+            onDeleteAll={deleteAllBreakpoints}
+            onSetAllEnabled={setAllEnabled}
+            onSetNodeEnabled={setNodeEnabled}
+          />
         </div>
       </div>
     </div>
