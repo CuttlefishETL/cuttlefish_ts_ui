@@ -1,0 +1,661 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+  -webkit-font-smoothing: antialiased;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ===== Меню приложения ===== */
+.menu-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: #2f2f2f;
+  color: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.menu-item {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.menu-item:hover {
+  background-color: #444;
+}
+
+/* ===== Основное тело ===== */
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ===== Обёртка левой панели ===== */
+.sidebar-wrap {
+  flex-shrink: 0;
+  display: flex;
+  min-width: 0;
+}
+
+/* ===== Левая панель ===== */
+.sidebar {
+  flex: 1;
+  width: 100%;
+  background-color: #eeeeee;
+  border-right: 1px solid #ccc;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ===== Тулбар (Добавить / Удалить / Обновить) ===== */
+.sidebar-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid #ccc;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.toolbar-btn {
+  flex: 1 1 60px;
+  min-width: 0;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+  background-color: #f5f5f5;
+  color: #222;
+  box-shadow: none;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background-color: #e0e0e0;
+  border-color: #999;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn.danger {
+  color: #b02020;
+}
+
+.toolbar-btn.danger:hover:not(:disabled) {
+  background-color: #fce4e4;
+  border-color: #b02020;
+}
+
+/* ===== Список серверов ===== */
+.server-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.server-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.server-item:hover {
+  background-color: #dcdcdc;
+}
+
+.server-item.active {
+  background-color: #396cd8;
+  color: #ffffff;
+}
+
+.server-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.server-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: #bbb;
+  transition: background-color 0.2s;
+}
+
+.server-status.ok {
+  background-color: #2ecc71;
+}
+
+.server-status.error {
+  background-color: #e74c3c;
+}
+
+.server-status.checking {
+  background-color: #f39c12;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.server-status.unknown {
+  background-color: #bbb;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.server-connected {
+  font-size: 12px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.server-list-empty {
+  padding: 8px 12px;
+  color: #888;
+  font-style: italic;
+}
+
+/* ===== Сплиттер ===== */
+.splitter {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background-color: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+.splitter::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background-color: transparent;
+  transition: background-color 0.15s;
+}
+
+.splitter:hover::before,
+.splitter.active::before {
+  background-color: #396cd8;
+}
+
+/* ===== Правая панель — вкладки ===== */
+.tabs-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: #ffffff;
+}
+
+.tabs-bar {
+  display: flex;
+  background-color: #e0e0e0;
+  border-bottom: 1px solid #ccc;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+  background-color: #d6d6d6;
+  white-space: nowrap;
+}
+
+.tab.active {
+  background-color: #ffffff;
+  border-bottom: 2px solid #396cd8;
+}
+
+.tab-close {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  box-shadow: none;
+}
+
+.tab-close:hover {
+  color: #d02020;
+}
+
+.tabs-empty {
+  padding: 8px 12px;
+  color: #888;
+  font-style: italic;
+}
+
+.tab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sub-tabs {
+  display: flex;
+  background-color: #fafafa;
+  border-bottom: 1px solid #ccc;
+  flex-shrink: 0;
+}
+
+.sub-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: #333;
+  font: inherit;
+  box-shadow: none;
+}
+
+.sub-tab:hover {
+  background-color: #f0f0f0;
+}
+
+.sub-tab.active {
+  color: #396cd8;
+  border-bottom-color: #396cd8;
+}
+
+.sub-tab-content {
+  flex: 1;
+  padding: 16px 24px;
+  overflow-y: auto;
+}
+
+.sub-tab-content h2 {
+  margin-top: 0;
+}
+
+/* ===== Пустые состояния ===== */
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-style: italic;
+}
+
+/* ===== Форма настроек ===== */
+.settings-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-form {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-weight: 500;
+  color: #444;
+  font-size: 13px;
+}
+
+.field input {
+  padding: 6px 10px;
+  font: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: #0f0f0f;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #396cd8;
+}
+
+.field input:read-only {
+  background-color: #f0f0f0;
+  color: #666;
+  cursor: default;
+}
+
+.check-result {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+
+.check-result.ok {
+  background-color: #e6f4ea;
+  color: #1e7a3b;
+  border-color: #b7dfc3;
+}
+
+.check-result.err {
+  background-color: #fce4e4;
+  color: #a02020;
+  border-color: #f0b7b7;
+}
+
+.placeholder-tab h2 {
+  margin-top: 0;
+}
+
+/* ===== Кнопки ===== */
+.btn {
+  padding: 5px 12px;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+  background-color: #f5f5f5;
+  color: #222;
+  box-shadow: none;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  background-color: #e0e0e0;
+  border-color: #999;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background-color: #396cd8;
+  border-color: #396cd8;
+  color: #fff;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background-color: #2f5bc0;
+  border-color: #2f5bc0;
+}
+
+.btn.danger {
+  color: #b02020;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background-color: #fce4e4;
+  border-color: #b02020;
+}
+
+/* ===== Модальные окна ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background-color: #ffffff;
+  color: #0f0f0f;
+  padding: 20px 24px;
+  border-radius: 8px;
+  min-width: 320px;
+  max-width: 440px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.modal p {
+  margin: 0 0 18px;
+  font-size: 14px;
+}
+
+.modal .field {
+  margin-bottom: 12px;
+}
+
+.modal .field:last-of-type {
+  margin-bottom: 16px;
+}
+
+.modal .check-result {
+  margin: 0 0 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ===== Тёмная тема ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f6f6f6;
+    background-color: #2f2f2f;
+  }
+
+  .sidebar {
+    background-color: #2a2a2a;
+    border-right-color: #444;
+  }
+
+  .sidebar-toolbar {
+    border-bottom-color: #444;
+  }
+
+  .toolbar-btn {
+    background-color: #333;
+    border-color: #555;
+    color: #eee;
+  }
+
+  .toolbar-btn:hover:not(:disabled) {
+    background-color: #444;
+    border-color: #777;
+  }
+
+  .toolbar-btn.danger {
+    color: #ff8080;
+  }
+
+  .toolbar-btn.danger:hover:not(:disabled) {
+    background-color: #5a2020;
+    border-color: #ff8080;
+  }
+
+  .server-item:hover {
+    background-color: #3a3a3a;
+  }
+
+  .server-item.active {
+    background-color: #396cd8;
+    color: #fff;
+  }
+
+  .server-status.unknown {
+    background-color: #555;
+  }
+
+  .tabs-panel {
+    background-color: #1e1e1e;
+  }
+
+  .tabs-bar {
+    background-color: #333;
+    border-bottom-color: #444;
+  }
+
+  .tab {
+    background-color: #2a2a2a;
+    border-right-color: #444;
+  }
+
+  .tab.active {
+    background-color: #1e1e1e;
+  }
+
+  .tab-close {
+    color: #aaa;
+  }
+
+  .sub-tabs {
+    background-color: #252525;
+    border-bottom-color: #444;
+  }
+
+  .sub-tab {
+    color: #ccc;
+  }
+
+  .sub-tab:hover {
+    background-color: #333;
+  }
+
+  .field label {
+    color: #aaa;
+  }
+
+  .field input {
+    background-color: #2a2a2a;
+    border-color: #555;
+    color: #f6f6f6;
+  }
+
+  .field input:focus {
+    border-color: #6f8cff;
+  }
+
+  .field input:read-only {
+    background-color: #222;
+    color: #999;
+  }
+
+  .check-result.ok {
+    background-color: #1e3a28;
+    color: #a5d6b5;
+    border-color: #2f6a44;
+  }
+
+  .check-result.err {
+    background-color: #3a1e1e;
+    color: #f0a5a5;
+    border-color: #6a2f2f;
+  }
+
+  .btn {
+    background-color: #333;
+    border-color: #555;
+    color: #eee;
+  }
+
+  .btn:hover:not(:disabled) {
+    background-color: #444;
+    border-color: #777;
+  }
+
+  .btn.primary {
+    background-color: #396cd8;
+    border-color: #396cd8;
+    color: #fff;
+  }
+
+  .btn.primary:hover:not(:disabled) {
+    background-color: #2f5bc0;
+    border-color: #2f5bc0;
+  }
+
+  .btn.danger {
+    color: #ff8080;
+  }
+
+  .btn.danger:hover:not(:disabled) {
+    background-color: #4a2020;
+    border-color: #ff8080;
+  }
+
+  .modal {
+    background-color: #2a2a2a;
+    color: #f6f6f6;
+  }
+}
