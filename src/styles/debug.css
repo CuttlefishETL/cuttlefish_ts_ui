@@ -1,0 +1,290 @@
+.debug-panels {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  min-height: 0;
+  border-top: 1px solid #ccc;
+}
+
+.debug-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background-color: #f5f5f5;
+}
+
+.debug-panel-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  border-bottom: 1px solid #ccc;
+  background-color: #e8e8e8;
+  flex-shrink: 0;
+}
+
+.debug-panel-count {
+  margin-left: 6px;
+  background-color: #d02020;
+  color: #ffffff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.debug-panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: "Fira Code", Consolas, Monaco, monospace;
+  color: #222;
+}
+
+.debug-empty {
+  color: #888;
+  font-style: italic;
+  padding: 6px;
+}
+
+.stack-frame {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.stack-frame:hover {
+  background-color: #e4e4e4;
+}
+
+.stack-frame.current {
+  background-color: #dce6fb;
+}
+
+.stack-frame-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stack-frame-loc {
+  color: #888;
+  flex-shrink: 0;
+}
+
+.message-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 4px;
+  white-space: pre-wrap;
+}
+
+.message-time {
+  color: #999;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.message-text {
+  word-break: break-word;
+}
+
+.var-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 4px;
+}
+
+.var-name {
+  color: #5a3d00;
+  font-weight: 500;
+}
+
+.var-value {
+  color: #0a6640;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.var-type {
+  color: #888;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.bp-tree-body {
+  padding: 4px 0;
+}
+
+.bp-tree-folder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bp-tree-folder:hover {
+  background-color: #e4e4e4;
+}
+
+.bp-tree-chevron {
+  width: 12px;
+  text-align: center;
+  color: #666;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.bp-tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bp-tree-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 0;
+  user-select: none;
+  color: #333;
+}
+
+.bp-tree-file-count {
+  flex-shrink: 0;
+  background-color: #d02020;
+  color: #ffffff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.bp-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.bp-header-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: #666;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 3px;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+.bp-header-btn:hover:not(:disabled) {
+  background-color: #ddd;
+  color: #222;
+}
+
+.bp-header-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bp-header-btn.danger:hover:not(:disabled) {
+  background-color: #fce4e4;
+  color: #d02020;
+}
+
+.bp-tree-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 0;
+  cursor: pointer;
+  border-radius: 3px;
+  color: #333;
+}
+
+.bp-tree-line:hover {
+  background-color: #e4e4e4;
+}
+
+.bp-tree-line-dot {
+  color: #d02020;
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.bp-tree-line.disabled .bp-tree-line-text {
+  color: #999;
+}
+
+.bp-tree-line.disabled .bp-tree-line-dot {
+  color: #d02020;
+  opacity: 0.4;
+}
+
+.bp-tree-line-text {
+  flex: 1;
+  font-size: 12px;
+}
+
+.bp-tree-remove {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: none;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.bp-tree-remove:hover {
+  color: #d02020;
+  background-color: rgba(208, 32, 32, 0.1);
+}
+
+.cm-breakpoint-gutter {
+  width: 14px;
+  cursor: pointer;
+}
+
+.cm-breakpoint-gutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cm-breakpoint-dot {
+  color: #d02020;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.cm-breakpoint-dot.disabled {
+  color: #d02020;
+  opacity: 0.5;
+}

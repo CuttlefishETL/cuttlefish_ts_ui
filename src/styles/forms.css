@@ -1,0 +1,115 @@
+.settings-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-form {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-weight: 500;
+  color: #444;
+  font-size: 13px;
+}
+
+.field input {
+  padding: 6px 10px;
+  font: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: #0f0f0f;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #396cd8;
+}
+
+.field input:read-only {
+  background-color: #f0f0f0;
+  color: #666;
+  cursor: default;
+}
+
+.check-result {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+
+.check-result.ok {
+  background-color: #e6f4ea;
+  color: #1e7a3b;
+  border-color: #b7dfc3;
+}
+
+.check-result.err {
+  background-color: #fce4e4;
+  color: #a02020;
+  border-color: #f0b7b7;
+}
+
+.placeholder-tab h2 {
+  margin-top: 0;
+}
+
+.btn {
+  padding: 5px 12px;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+  background-color: #f5f5f5;
+  color: #222;
+  box-shadow: none;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  background-color: #e0e0e0;
+  border-color: #999;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background-color: #396cd8;
+  border-color: #396cd8;
+  color: #fff;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background-color: #2f5bc0;
+  border-color: #2f5bc0;
+}
+
+.btn.danger {
+  color: #b02020;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background-color: #fce4e4;
+  border-color: #b02020;
+}

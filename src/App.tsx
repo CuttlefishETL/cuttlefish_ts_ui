@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import "./App.css";
+import  "./styles/app.css";
 
 import { MenuBar } from "./components/MenuBar";
 import { Sidebar } from "./components/Sidebar";

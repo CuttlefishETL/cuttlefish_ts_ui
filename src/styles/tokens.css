@@ -1,0 +1,11 @@
+/* Переменные темы. В этой итерации используются только --bg, --fg и шрифты.
+   Полное вынесение цветов — следующий шаг (см. комментарий внизу). */
+:root {
+  --font-ui: Inter, Avenir, Helvetica, Arial, sans-serif;
+  --font-mono: "Fira Code", Consolas, Monaco, "Courier New", monospace;
+  --font-size: 14px;
+  --line-height: 1.4;
+
+  --bg: #f6f6f6;
+  --fg: #0f0f0f;
+}
