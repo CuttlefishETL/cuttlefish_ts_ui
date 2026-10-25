@@ -25,7 +25,7 @@ import { AboutDialog } from "./components/AboutDialog";
 import { AuthDialog } from "./components/AuthDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ConfirmDialog } from "./components/ConfirmDialog";
-import { ContextMenu, ContextMenuItem } from "./components/ContextMenu";
+import { ContextMenu, ContextMenuItem, AnchorRect } from "./components/ContextMenu";
 import { ServerEditDialog, ServerEditDraft } from "./components/ServerEditDialog";
 import { baseNameOf } from "./pathUtils";
 
@@ -67,8 +67,7 @@ interface EditState {
 }
 
 interface CtxMenuState {
-  x: number;
-  y: number;
+  anchor: AnchorRect;
   targetId: NodeId | null;
 }
 
@@ -213,12 +212,15 @@ export default function App() {
         const currentPath = findPath(prev, id);
         const currentParent =
           currentPath.length > 1 ? currentPath[currentPath.length - 2] : null;
-        let next = updateNode(prev, id, {
+
+        const patch: Partial<ServerLeaf> = {
           name: draft.name,
           ...(draft.kind === "server"
             ? { url: draft.url, port: draft.port }
             : {}),
-        } as Partial<ServerNode>);
+        };
+
+        let next = updateNode(prev, id, patch);
         if ((currentParent?.id ?? null) !== draft.parentId) {
           next = moveNode(next, id, draft.parentId);
         }
@@ -263,32 +265,39 @@ export default function App() {
 
   // --- context menu ---
   const openContext = (id: NodeId | null, x: number, y: number) => {
-    setCtxMenu({ x, y, targetId: id });
+    // клиентские координаты курсора превращаем в AnchorRect;
+    // ContextMenu сам решит, открыть вниз или вверх, и удержит в окне.
+    const anchor: AnchorRect = { left: x, top: y, right: x, bottom: y };
+    setCtxMenu({ anchor, targetId: id });
   };
 
   const contextItems = (): ContextMenuItem[] => {
     if (!ctxMenu) return [];
     const id = ctxMenu.targetId;
+
     if (id === null) {
       return [
-        { label: "Добавить сервер", onClick: () => openAdd("server", null) },
-        { label: "Добавить папку", onClick: () => openAdd("folder", null) },
+        { label: "Добавить сервер", action: () => openAdd("server", null) },
+        { label: "Добавить папку", action: () => openAdd("folder", null) },
       ];
     }
+
     const node = findNode(servers, id);
     if (!node) return [];
+
     if (node.kind === "folder") {
       return [
-        { label: "Добавить сервер", onClick: () => openAdd("server", id) },
-        { label: "Добавить папку", onClick: () => openAdd("folder", id) },
-        { label: "Переименовать", onClick: () => openEdit(id) },
-        { label: "Удалить", onClick: () => askDelete(id), danger: true },
+        { label: "Добавить сервер", action: () => openAdd("server", id) },
+        { label: "Добавить папку", action: () => openAdd("folder", id) },
+        { label: "Переименовать", action: () => openEdit(id) },
+        { label: "Удалить", action: () => askDelete(id) },
       ];
     }
+
     return [
-      { label: "Подключиться", onClick: () => void checkOne(node) },
-      { label: "Изменить", onClick: () => openEdit(id) },
-      { label: "Удалить", onClick: () => askDelete(id), danger: true },
+      { label: "Подключиться", action: () => void checkOne(node) },
+      { label: "Изменить", action: () => openEdit(id) },
+      { label: "Удалить", action: () => askDelete(id) },
     ];
   };
 
@@ -443,8 +452,7 @@ export default function App() {
 
       {ctxMenu && (
         <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
+          anchor={ctxMenu.anchor}
           items={contextItems()}
           onClose={() => setCtxMenu(null)}
         />
