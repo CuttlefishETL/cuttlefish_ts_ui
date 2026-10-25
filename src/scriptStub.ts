@@ -17,6 +17,29 @@ export interface DebugState {
   currentLine: number | null;
 }
 
+export interface StackFrame {
+  id: number;
+  name: string;
+  file: string;
+  line: number;
+}
+
+export type OutputKind = "log" | "info" | "error" | "warn";
+
+export interface OutputMessage {
+  id: number;
+  kind: OutputKind;
+  time: string;
+  text: string;
+}
+
+export interface Variable {
+  name: string;
+  value: string;
+  type: string;
+  children?: Variable[];
+}
+
 // --- Стаб-данные ---
 export const STUB_FILES: ScriptFileNode[] = [
   {
@@ -94,6 +117,35 @@ export function getFileContent(path: string): string {
   return FILE_CONTENTS[path] ?? "-- empty file\n";
 }
 
+export const STUB_STACK_FRAMES: StackFrame[] = [
+  { id: 0, name: "main", file: "/scripts/main.lua", line: 7 },
+  { id: 1, name: "compute", file: "/scripts/lib/utils.lua", line: 4 },
+  { id: 2, name: "log", file: "/scripts/lib/helpers.lua", line: 4 },
+];
+
+export const STUB_MESSAGES: OutputMessage[] = [
+  { id: 1, kind: "info", time: "12:00:01", text: "Debug session started" },
+  { id: 2, kind: "log", time: "12:00:02", text: "Hello from main" },
+  { id: 3, kind: "warn", time: "12:00:03", text: "Deprecated API used" },
+  { id: 4, kind: "error", time: "12:00:04", text: "Attempt to index a nil value (local 'x')" },
+];
+
+export const STUB_VARIABLES: Variable[] = [
+  { name: "x", value: "42", type: "number" },
+  { name: "result", value: "84", type: "number" },
+  { name: "msg", value: '"hello"', type: "string" },
+  {
+    name: "config",
+    value: "{...}",
+    type: "table",
+    children: [
+      { name: "host", value: '"localhost"', type: "string" },
+      { name: "port", value: "8080", type: "number" },
+      { name: "debug", value: "true", type: "boolean" },
+    ],
+  },
+];
+
 // --- "DAP-клиент" (заглушка) ---
 type Listener = (state: DebugState) => void;
 
@@ -112,7 +164,9 @@ class StubDapClient {
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
     fn(this.state);
-    return () => this.listeners.delete(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
   }
 
   private set(patch: Partial<DebugState>) {

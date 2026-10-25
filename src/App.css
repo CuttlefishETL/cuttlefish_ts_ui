@@ -303,7 +303,7 @@ body,
   font-style: italic;
 }
 
-/* ===== Сплиттер ===== */
+/* ===== Сплиттер между панелями App ===== */
 .splitter {
   width: 6px;
   flex-shrink: 0;
@@ -666,7 +666,383 @@ body,
   cursor: default;
 }
 
-/* ===== Тёмная тема ===== */
+/* ===================================================================
+   Вкладка Scripts
+   =================================================================== */
+.scripts-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.scripts-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #ccc;
+  background-color: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.scripts-toolbar .toolbar-btn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+}
+
+.scripts-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #ccc;
+  margin: 0 4px;
+}
+
+.scripts-toolbar-status {
+  margin-left: auto;
+  color: #666;
+  font-size: 12px;
+  padding: 0 6px;
+}
+
+.scripts-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.scripts-top {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.scripts-tree-wrap {
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scripts-tree {
+  width: 100%;
+  height: 100%;
+  background-color: #eeeeee;
+  overflow-y: auto;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.tree-folder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-folder:hover {
+  background-color: #dcdcdc;
+}
+
+.tree-chevron {
+  width: 12px;
+  text-align: center;
+  color: #666;
+}
+
+.tree-file {
+  padding: 3px 8px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-file:hover {
+  background-color: #dcdcdc;
+}
+
+.tree-file.active {
+  background-color: #396cd8;
+  color: #ffffff;
+}
+
+.scripts-editors-wrap {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scripts-editors {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background-color: #ffffff;
+}
+
+.scripts-tabs-bar {
+  display: flex;
+  background-color: #e0e0e0;
+  border-bottom: 1px solid #ccc;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.script-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+  background-color: #d6d6d6;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.script-tab.active {
+  background-color: #ffffff;
+  border-bottom: 2px solid #396cd8;
+}
+
+.scripts-tabs-empty {
+  padding: 6px 12px;
+  color: #888;
+  font-style: italic;
+  font-size: 13px;
+}
+
+.scripts-editor-host {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scripts-editor {
+  position: absolute;
+  inset: 0;
+}
+
+.scripts-editor .cm-editor {
+  height: 100%;
+}
+
+.scripts-editor .cm-scroller {
+  font-family: "Fira Code", Consolas, Monaco, "Courier New", monospace;
+  font-size: 13px;
+}
+
+.scripts-editor-placeholder {
+  flex: 1;
+}
+
+.scripts-bottom {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Сплиттеры Scripts ===== */
+.splitter-v,
+.splitter-h {
+  flex-shrink: 0;
+  position: relative;
+  background-color: transparent;
+  z-index: 1;
+}
+
+.splitter-v {
+  width: 6px;
+  cursor: col-resize;
+}
+
+.splitter-v::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background-color: transparent;
+  transition: background-color 0.15s;
+}
+
+.splitter-v:hover::before,
+.splitter-v.active::before {
+  background-color: #396cd8;
+}
+
+.splitter-h {
+  height: 6px;
+  width: 100%;
+  cursor: row-resize;
+}
+
+.splitter-h::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  height: 2px;
+  background-color: transparent;
+  transition: background-color 0.15s;
+}
+
+.splitter-h:hover::before,
+.splitter-h.active::before {
+  background-color: #396cd8;
+}
+
+/* ===== Панели отладки ===== */
+.debug-panels {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  min-height: 0;
+  border-top: 1px solid #ccc;
+}
+
+.debug-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background-color: #f5f5f5;
+}
+
+.debug-panel-header {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  border-bottom: 1px solid #ccc;
+  background-color: #e8e8e8;
+  flex-shrink: 0;
+}
+
+.debug-panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: "Fira Code", Consolas, Monaco, monospace;
+  color: #222;
+}
+
+.debug-empty {
+  color: #888;
+  font-style: italic;
+  padding: 6px;
+}
+
+.stack-frame {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.stack-frame:hover {
+  background-color: #e4e4e4;
+}
+
+.stack-frame.current {
+  background-color: #dce6fb;
+}
+
+.stack-frame-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stack-frame-loc {
+  color: #888;
+  flex-shrink: 0;
+}
+
+.message-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 4px;
+  white-space: pre-wrap;
+}
+
+.message-time {
+  color: #999;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.message-text {
+  word-break: break-word;
+}
+
+.var-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 4px;
+}
+
+.var-name {
+  color: #5a3d00;
+  font-weight: 500;
+}
+
+.var-value {
+  color: #0a6640;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.var-type {
+  color: #888;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ===== Гуттер точек останова ===== */
+.cm-breakpoint-gutter {
+  width: 14px;
+  cursor: pointer;
+}
+
+.cm-breakpoint-gutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cm-breakpoint-dot {
+  color: #d02020;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* ===================================================================
+   Тёмная тема
+   =================================================================== */
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
@@ -853,186 +1229,8 @@ body,
     color: #f6f6f6;
     border-color: #555;
   }
-}
 
-/* ===== Вкладка Scripts ===== */
-.scripts-tab {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-.scripts-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid #ccc;
-  background-color: #f5f5f5;
-  flex-shrink: 0;
-}
-
-.scripts-toolbar .toolbar-btn {
-  flex: 0 0 auto;
-  padding: 4px 10px;
-}
-
-.scripts-toolbar-divider {
-  width: 1px;
-  height: 20px;
-  background-color: #ccc;
-  margin: 0 4px;
-}
-
-.scripts-toolbar-status {
-  margin-left: auto;
-  color: #666;
-  font-size: 12px;
-  padding: 0 6px;
-}
-
-.scripts-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Левое дерево */
-.scripts-tree {
-  width: 220px;
-  flex-shrink: 0;
-  background-color: #eeeeee;
-  border-right: 1px solid #ccc;
-  overflow-y: auto;
-  padding: 4px 0;
-  font-size: 13px;
-}
-
-.tree-folder {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.tree-folder:hover {
-  background-color: #dcdcdc;
-}
-
-.tree-chevron {
-  width: 12px;
-  text-align: center;
-  color: #666;
-}
-
-.tree-file {
-  padding: 3px 8px;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tree-file:hover {
-  background-color: #dcdcdc;
-}
-
-.tree-file.active {
-  background-color: #396cd8;
-  color: #ffffff;
-}
-
-/* Правая часть: вкладки редакторов */
-.scripts-editors {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background-color: #ffffff;
-}
-
-.scripts-tabs-bar {
-  display: flex;
-  background-color: #e0e0e0;
-  border-bottom: 1px solid #ccc;
-  overflow-x: auto;
-  flex-shrink: 0;
-}
-
-.script-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  cursor: pointer;
-  border-right: 1px solid #ccc;
-  background-color: #d6d6d6;
-  white-space: nowrap;
-  font-size: 13px;
-}
-
-.script-tab.active {
-  background-color: #ffffff;
-  border-bottom: 2px solid #396cd8;
-}
-
-.scripts-tabs-empty {
-  padding: 6px 12px;
-  color: #888;
-  font-style: italic;
-  font-size: 13px;
-}
-
-.scripts-editor-host {
-  flex: 1;
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.scripts-editor {
-  position: absolute;
-  inset: 0;
-}
-
-.scripts-editor .cm-editor {
-  height: 100%;
-}
-
-.scripts-editor .cm-scroller {
-  font-family: "Fira Code", Consolas, Monaco, "Courier New", monospace;
-  font-size: 13px;
-}
-
-.scripts-editor-placeholder {
-  flex: 1;
-}
-
-/* Гуттер точек останова */
-.cm-breakpoint-gutter {
-  width: 14px;
-  cursor: pointer;
-}
-
-.cm-breakpoint-gutter .cm-gutterElement {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cm-breakpoint-dot {
-  color: #d02020;
-  font-size: 12px;
-  line-height: 1;
-}
-
-/* Тёмная тема */
-@media (prefers-color-scheme: dark) {
+  /* ===== Scripts — тёмная тема ===== */
   .scripts-toolbar {
     background-color: #252525;
     border-bottom-color: #444;
@@ -1048,7 +1246,6 @@ body,
 
   .scripts-tree {
     background-color: #2a2a2a;
-    border-right-color: #444;
   }
 
   .tree-folder:hover,
@@ -1081,5 +1278,55 @@ body,
 
   .script-tab.active {
     background-color: #1e1e1e;
+  }
+
+  .debug-panels {
+    border-top-color: #444;
+  }
+
+  .debug-panel {
+    background-color: #252525;
+  }
+
+  .debug-panel-header {
+    background-color: #2f2f2f;
+    border-bottom-color: #444;
+    color: #aaa;
+  }
+
+  .debug-panel-body {
+    color: #ddd;
+  }
+
+  .debug-empty {
+    color: #888;
+  }
+
+  .stack-frame:hover {
+    background-color: #333;
+  }
+
+  .stack-frame.current {
+    background-color: #2a3a5a;
+  }
+
+  .stack-frame-loc {
+    color: #888;
+  }
+
+  .message-time {
+    color: #777;
+  }
+
+  .var-name {
+    color: #e0c48a;
+  }
+
+  .var-value {
+    color: #8fd4a4;
+  }
+
+  .var-type {
+    color: #888;
   }
 }
