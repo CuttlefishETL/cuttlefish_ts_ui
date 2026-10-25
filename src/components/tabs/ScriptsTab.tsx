@@ -73,17 +73,13 @@ export function ScriptsTab() {
     []
   );
 
-  const toggleBreakpoint = useCallback((path: string, line: number) => {
-    setBreakpointsByFile((prev) => {
-      const cur = prev[path] ?? new Set<number>();
-      const next = new Set(cur);
-      if (next.has(line)) next.delete(line);
-      else next.add(line);
-      return { ...prev, [path]: next };
-    });
-  }, []);
+  const changeBreakpoints = useCallback(
+    (path: string, bps: Set<number>) => {
+      setBreakpointsByFile((prev) => ({ ...prev, [path]: bps }));
+    },
+    []
+  );
 
-  // Горизонтальный сплиттер между top и bottom
   const onVerticalSplitDelta = useCallback((delta: number) => {
     if (!containerRef.current) return;
     const total = containerRef.current.clientHeight;
@@ -113,6 +109,7 @@ export function ScriptsTab() {
             <ScriptFileTree
               nodes={STUB_FILES}
               activePath={activePath}
+              breakpointsByFile={breakpointsByFile}
               onOpen={openFile}
             />
           </div>
@@ -132,7 +129,7 @@ export function ScriptsTab() {
               onActivate={setActivePath}
               onClose={closeFile}
               onChange={changeFileContent}
-              onToggleBreakpoint={toggleBreakpoint}
+              onBreakpointsChange={changeBreakpoints}
             />
           </div>
         </div>

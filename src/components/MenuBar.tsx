@@ -9,6 +9,7 @@ interface MenuBarProps {
   onOpenRecent: (path: string) => void;
   onExit: () => void;
   onAbout: () => void;
+  onSettings: () => void;
   recentFiles: string[];
   currentFilePath: string | null;
   dirty: boolean;
@@ -34,6 +35,7 @@ export function MenuBar({
   onOpenRecent,
   onExit,
   onAbout,
+  onSettings,
   recentFiles,
   currentFilePath,
   dirty,
@@ -41,7 +43,6 @@ export function MenuBar({
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Закрытие по клику вне меню
   useEffect(() => {
     if (!openMenu) return;
     const onDown = (e: MouseEvent) => {
@@ -164,6 +165,12 @@ export function MenuBar({
             })}
           </div>
         )}
+      </div>
+
+      <div className="menu-root">
+        <button type="button" className="menu-item" onClick={onSettings}>
+          Настройка
+        </button>
       </div>
 
       <div className="menu-root">

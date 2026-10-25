@@ -14,6 +14,14 @@ import type { Server, TabId } from "./types";
 import { checkConnection, type CheckStatus } from "./checkConnection";
 import { baseNameOf } from "./pathUtils";
 
+import { SettingsDialog } from "./components/SettingsDialog";
+import {
+  loadAppSettings,
+  saveAppSettings,
+  type AppSettings,
+} from "./appSettings";
+
+
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 600;
 const DEFAULT_WIDTH = 260;
@@ -110,6 +118,9 @@ function App() {
   const [pendingDelete, setPendingDelete] = useState<Server | null>(null);
   const [pendingClose, setPendingClose] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+
+  const [appSettings, setAppSettings] = useState<AppSettings>(loadAppSettings);
+  const [appSettingsOpen, setAppSettingsOpen] = useState(false);
 
   const bypassCloseCheck = useRef(false);
   const dirtyRef = useRef(dirty);
@@ -302,6 +313,12 @@ function App() {
       alert(`Не удалось сохранить файл: ${err}`);
       return false;
     }
+  };
+
+  const handleSaveAppSettings = (next: AppSettings) => {
+    setAppSettings(next);
+    saveAppSettings(next);
+    setAppSettingsOpen(false);
   };
 
   const handleNewFile = () => {
@@ -559,6 +576,7 @@ function App() {
         onOpenRecent={handleOpenRecent}
         onExit={handleExit}
         onAbout={() => setAboutOpen(true)}
+        onSettings={() => setAppSettingsOpen(true)}
       />
       <div className="body">
         <div className="sidebar-wrap" style={{ width: sidebarWidth }}>
@@ -629,7 +647,14 @@ function App() {
       />
 
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
-
+      
+      <SettingsDialog
+        open={appSettingsOpen}
+        settings={appSettings}
+        onSave={handleSaveAppSettings}
+        onClose={() => setAppSettingsOpen(false)}
+      />
+      
       <AuthDialog
         open={authTarget !== null}
         serverName={authTarget?.name || "(без имени)"}

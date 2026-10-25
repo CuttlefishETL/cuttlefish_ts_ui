@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { StreamLanguage } from "@codemirror/language";
 import { lua } from "@codemirror/legacy-modes/mode/lua";
-import { breakpointGutter } from "./breakpointGutter";
+import { EditorView } from "@codemirror/view";
+import {
+  breakpointField,
+  breakpointGutter,
+  breakpointKeymap,
+  breakpointTheme,
+  getBreakpoints,
+  setBreakpointsEffect,
+  toggleBreakpointEffect,
+  setsEqual,
+} from "./breakpointField";
 
 interface OpenFile {
   path: string;
@@ -17,8 +27,10 @@ interface ScriptEditorTabsProps {
   onActivate: (path: string) => void;
   onClose: (path: string) => void;
   onChange: (path: string, content: string) => void;
-  onToggleBreakpoint: (path: string, line: number) => void;
+  onBreakpointsChange: (path: string, bps: Set<number>) => void;
 }
+
+const EMPTY_SET: Set<number> = new Set();
 
 export function ScriptEditorTabs({
   openFiles,
@@ -27,7 +39,7 @@ export function ScriptEditorTabs({
   onActivate,
   onClose,
   onChange,
-  onToggleBreakpoint,
+  onBreakpointsChange,
 }: ScriptEditorTabsProps) {
   const activeFile = openFiles.find((f) => f.path === activePath);
 
@@ -65,11 +77,11 @@ export function ScriptEditorTabs({
           <ScriptEditor
             key={file.path}
             file={file}
-            breakpoints={breakpointsByFile[file.path] ?? new Set()}
+            breakpoints={breakpointsByFile[file.path] ?? EMPTY_SET}
             visible={activePath === file.path}
             onChange={(content) => onChange(file.path, content)}
-            onToggleBreakpoint={(line) =>
-              onToggleBreakpoint(file.path, line)
+            onBreakpointsChange={(bps) =>
+              onBreakpointsChange(file.path, bps)
             }
           />
         ))}
@@ -86,13 +98,13 @@ function ScriptEditor({
   breakpoints,
   visible,
   onChange,
-  onToggleBreakpoint,
+  onBreakpointsChange,
 }: {
   file: OpenFile;
   breakpoints: Set<number>;
   visible: boolean;
   onChange: (content: string) => void;
-  onToggleBreakpoint: (line: number) => void;
+  onBreakpointsChange: (bps: Set<number>) => void;
 }) {
   const [isDark, setIsDark] = useState(
     () =>
@@ -108,12 +120,54 @@ function ScriptEditor({
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  const viewRef = useRef<EditorView | null>(null);
+  const breakpointsRef = useRef(breakpoints);
+  breakpointsRef.current = breakpoints;
+
+  const onBpChangeRef = useRef(onBreakpointsChange);
+  onBpChangeRef.current = onBreakpointsChange;
+
+  const onCreateEditor = useCallback((view: EditorView) => {
+    viewRef.current = view;
+    if (breakpointsRef.current.size > 0) {
+      view.dispatch({
+        effects: setBreakpointsEffect.of([...breakpointsRef.current]),
+      });
+    }
+  }, []);
+
+  // Внешние изменения брейкпоинтов → StateField
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const current = view.state.field(breakpointField);
+    if (setsEqual(current, breakpoints)) return;
+    view.dispatch({
+      effects: setBreakpointsEffect.of([...breakpoints]),
+    });
+  }, [breakpoints]);
+
+  // StateField меняется (клик по гуттеру / F9) → сообщаем наружу
   const extensions = useMemo(
     () => [
       StreamLanguage.define(lua),
-      breakpointGutter(breakpoints, onToggleBreakpoint),
+      breakpointField,
+      breakpointGutter,
+      breakpointKeymap,
+      breakpointTheme,
+      EditorView.updateListener.of((update) => {
+        const hasBpEffect = update.transactions.some((tr) =>
+          tr.effects.some(
+            (e) =>
+              e.is(toggleBreakpointEffect) || e.is(setBreakpointsEffect)
+          )
+        );
+        if (hasBpEffect) {
+          onBpChangeRef.current(getBreakpoints(update.view));
+        }
+      }),
     ],
-    [breakpoints, onToggleBreakpoint]
+    []
   );
 
   const handleChange = useCallback(
@@ -132,6 +186,7 @@ function ScriptEditor({
         extensions={extensions}
         theme={isDark ? "dark" : "light"}
         onChange={handleChange}
+        onCreateEditor={onCreateEditor}
         basicSetup={{
           lineNumbers: true,
           foldGutter: true,
