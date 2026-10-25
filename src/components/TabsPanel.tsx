@@ -3,6 +3,7 @@ import { SettingsTab } from "./tabs/SettingsTab";
 import { ConnectorsTab } from "./tabs/ConnectorsTab";
 import { PluginsTab } from "./tabs/PluginsTab";
 import { MetricsTab } from "./tabs/MetricsTab";
+import { ScriptsTab } from "./tabs/ScriptsTab";
 
 interface TabsPanelProps {
   servers: Server[];
@@ -63,6 +64,8 @@ export function TabsPanel({
         return <PluginsTab />;
       case "metrics":
         return <MetricsTab />;
+      case "scripts":
+        return <ScriptsTab />;
     }
   };
 

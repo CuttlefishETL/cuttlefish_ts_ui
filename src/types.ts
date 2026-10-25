@@ -1,4 +1,4 @@
-export type TabId = "settings" | "connectors" | "plugins" | "metrics";
+export type TabId = "settings" | "connectors" | "plugins" | "metrics" | "scripts";
 
 export interface Server {
   id: string;

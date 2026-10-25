@@ -5,6 +5,7 @@ export const SETTINGS_TABS: SubTab[] = [
   { id: "connectors", name: "Коннекторы" },
   { id: "plugins", name: "Плагины" },
   { id: "metrics", name: "Метрики" },
+  { id: "scripts", name: "Scripts" },
 ];
 
 export const INITIAL_SERVERS: Server[] = [
