@@ -46,7 +46,7 @@ function App() {
   // --- Локальное UI-состояние ---
   const [aboutOpen, setAboutOpen] = useState(false);
 
-  // --- Применение загруженного состояния (после open / openRecent / initial) ---
+  // --- Применение загруженного состояния ---
   const loadAndApply = (loaded: ServerNode[]) => {
     servers.applyLoaded(loaded);
     const first = flattenServers(loaded)[0]?.id ?? null;
@@ -163,7 +163,10 @@ function App() {
     fileIO.markDirty();
   };
 
-  const handleServerChange = (serverId: string, patch: Partial<Server>) => {
+  const handleServerChange = (
+    serverId: string,
+    patch: Partial<Server>,
+  ) => {
     servers.update(serverId, patch);
     fileIO.markDirty();
   };
@@ -181,7 +184,6 @@ function App() {
     tabs.selectSub(tabId);
   };
 
-  // --- JSX ---
   return (
     <div className="app">
       <MenuBar
@@ -213,7 +215,9 @@ function App() {
             }
             onConnect={(id) => connections.connect(id, servers.servers)}
             onDisconnect={connections.disconnect}
-            onReconnect={(id) => connections.reconnect(id, servers.servers)}
+            onReconnect={(id) =>
+              connections.reconnect(id, servers.servers)
+            }
             onAddServer={handleAddServer}
             onAddFolder={handleAddFolder}
             onRename={handleRename}

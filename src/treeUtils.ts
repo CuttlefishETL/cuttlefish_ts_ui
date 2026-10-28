@@ -6,10 +6,11 @@ import type {
   ServerNode,
 } from "./types";
 
-export const isFolder = (n: ServerNode): n is ServerFolder => n.kind === "folder";
-export const isServerNode = (n: ServerNode): n is ServerLeaf => n.kind === "server";
-export const isServer = isServerNode; // старый алиас
-export const findNode = findNodeById; // старый алиас (объявлен ниже)
+export const isFolder = (n: ServerNode): n is ServerFolder =>
+  n.kind === "folder";
+
+export const isServerNode = (n: ServerNode): n is ServerLeaf =>
+  n.kind === "server";
 
 export function flattenServers(nodes: ServerNode[]): ServerLeaf[] {
   const out: ServerLeaf[] = [];
@@ -20,7 +21,10 @@ export function flattenServers(nodes: ServerNode[]): ServerLeaf[] {
   return out;
 }
 
-export function findNodeById(nodes: ServerNode[], id: NodeId): ServerNode | null {
+export function findNodeById(
+  nodes: ServerNode[],
+  id: NodeId,
+): ServerNode | null {
   for (const n of nodes) {
     if (n.id === id) return n;
     if (isFolder(n)) {
@@ -31,7 +35,10 @@ export function findNodeById(nodes: ServerNode[], id: NodeId): ServerNode | null
   return null;
 }
 
-export function findServerById(nodes: ServerNode[], id: NodeId): ServerLeaf | null {
+export function findServerById(
+  nodes: ServerNode[],
+  id: NodeId,
+): ServerLeaf | null {
   const n = findNodeById(nodes, id);
   return n && isServerNode(n) ? n : null;
 }
@@ -44,14 +51,19 @@ export function insertNode(
   if (parentId === null) return [...nodes, child];
   return nodes.map((n) => {
     if (isFolder(n)) {
-      if (n.id === parentId) return { ...n, children: [...n.children, child] };
+      if (n.id === parentId) {
+        return { ...n, children: [...n.children, child] };
+      }
       return { ...n, children: insertNode(n.children, parentId, child) };
     }
     return n;
   });
 }
 
-export function removeNode(nodes: ServerNode[], id: NodeId): ServerNode[] {
+export function removeNode(
+  nodes: ServerNode[],
+  id: NodeId,
+): ServerNode[] {
   return nodes
     .filter((n) => n.id !== id)
     .map((n) =>
