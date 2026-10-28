@@ -25,47 +25,47 @@
 
 .field label {
   font-weight: 500;
-  color: #444;
+  color: var(--fg-label);
   font-size: 13px;
 }
 
 .field input {
   padding: 6px 10px;
   font: inherit;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background-color: #ffffff;
-  color: #0f0f0f;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  color: var(--fg);
 }
 
 .field input:focus {
   outline: none;
-  border-color: #396cd8;
+  border-color: var(--accent-focus);
 }
 
 .field input:read-only {
-  background-color: #f0f0f0;
-  color: #666;
+  background-color: var(--bg-input-readonly);
+  color: var(--fg-muted);
   cursor: default;
 }
 
 .check-result {
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   border: 1px solid transparent;
 }
 
 .check-result.ok {
-  background-color: #e6f4ea;
-  color: #1e7a3b;
-  border-color: #b7dfc3;
+  background-color: var(--check-ok-bg);
+  color: var(--check-ok-fg);
+  border-color: var(--check-ok-border);
 }
 
 .check-result.err {
-  background-color: #fce4e4;
-  color: #a02020;
-  border-color: #f0b7b7;
+  background-color: var(--check-err-bg);
+  color: var(--check-err-fg);
+  border-color: var(--check-err-border);
 }
 
 .placeholder-tab h2 {
@@ -76,17 +76,17 @@
   padding: 5px 12px;
   font: inherit;
   cursor: pointer;
-  border-radius: 4px;
-  border: 1px solid #bbb;
-  background-color: #f5f5f5;
-  color: #222;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-button);
+  color: var(--fg-strong);
   box-shadow: none;
   transition: background-color 0.15s, border-color 0.15s;
 }
 
 .btn:hover:not(:disabled) {
-  background-color: #e0e0e0;
-  border-color: #999;
+  background-color: var(--bg-button-hover);
+  border-color: var(--border-strong);
 }
 
 .btn:disabled {
@@ -95,21 +95,21 @@
 }
 
 .btn.primary {
-  background-color: #396cd8;
-  border-color: #396cd8;
-  color: #fff;
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: var(--fg-inverse);
 }
 
 .btn.primary:hover:not(:disabled) {
-  background-color: #2f5bc0;
-  border-color: #2f5bc0;
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn.danger {
-  color: #b02020;
+  color: var(--danger);
 }
 
 .btn.danger:hover:not(:disabled) {
-  background-color: #fce4e4;
-  border-color: #b02020;
+  background-color: var(--danger-bg);
+  border-color: var(--danger);
 }

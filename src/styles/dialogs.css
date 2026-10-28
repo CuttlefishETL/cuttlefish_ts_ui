@@ -1,7 +1,7 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.35);
+  background-color: var(--shadow-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9,13 +9,13 @@
 }
 
 .modal {
-  background-color: #ffffff;
-  color: #0f0f0f;
+  background-color: var(--bg-elevated);
+  color: var(--fg);
   padding: 20px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   min-width: 320px;
   max-width: 440px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .modal h3 {
@@ -66,7 +66,7 @@
 
 .about-key {
   min-width: 100px;
-  color: #666;
+  color: var(--fg-muted);
   font-weight: 500;
 }
 
@@ -104,11 +104,11 @@
 
 .context-menu {
   position: fixed;
-  background-color: #ffffff;
-  color: #0f0f0f;
-  border: 1px solid #bbb;
-  border-radius: 4px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  background-color: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
   padding: 4px 0;
   z-index: 9999;
   min-width: 180px;
@@ -129,8 +129,8 @@
 }
 
 .context-menu-item:hover:not(:disabled) {
-  background-color: #396cd8;
-  color: #ffffff;
+  background-color: var(--accent);
+  color: var(--fg-inverse);
 }
 
 .context-menu-item:disabled {

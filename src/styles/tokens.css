@@ -1,11 +1,86 @@
-/* Переменные темы. В этой итерации используются только --bg, --fg и шрифты.
-   Полное вынесение цветов — следующий шаг (см. комментарий внизу). */
 :root {
+  /* ===== Типографика ===== */
   --font-ui: Inter, Avenir, Helvetica, Arial, sans-serif;
   --font-mono: "Fira Code", Consolas, Monaco, "Courier New", monospace;
   --font-size: 14px;
   --line-height: 1.4;
 
+  /* ===== Фоны ===== */
   --bg: #f6f6f6;
+  --bg-sidebar: #eeeeee;
+  --bg-panel: #ffffff;
+  --bg-tabbar: #e0e0e0;
+  --bg-tab: #d6d6d6;
+  --bg-tab-active: #ffffff;
+  --bg-subtabs: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-hover: #dcdcdc;
+  --bg-hover-subtle: #f0f0f0;
+  --bg-button: #f5f5f5;
+  --bg-button-hover: #e0e0e0;
+  --bg-toolbar: #f5f5f5;
+  --bg-input: #ffffff;
+  --bg-input-readonly: #f0f0f0;
+  --bg-debug-panel: #f5f5f5;
+  --bg-debug-header: #e8e8e8;
+  --bg-stack-current: #dce6fb;
+  --bg-drag-over: #d3e2ff;
+  --bg-drag-over-list: #eef3ff;
+
+  /* ===== Текст ===== */
   --fg: #0f0f0f;
+  --fg-strong: #222222;
+  --fg-label: #444444;
+  --fg-muted: #666666;
+  --fg-dim: #888888;
+  --fg-subtle: #999999;
+  --fg-inverse: #ffffff;
+
+  /* ===== Акцент и семантика ===== */
+  --accent: #396cd8;
+  --accent-hover: #2f5bc0;
+  --accent-focus: #396cd8;
+  --danger: #b02020;
+  --danger-bg: #fce4e4;
+  --danger-strong: #d02020;
+  --danger-hover-bg: rgba(208, 32, 32, 0.1);
+  --success: #2ecc71;
+  --warning: #f39c12;
+  --error-status: #e74c3c;
+  --status-unknown: #bbbbbb;
+
+  /* ===== Границы ===== */
+  --border: #cccccc;
+  --border-subtle: #bbbbbb;
+  --border-strong: #999999;
+
+  /* ===== Check-result ===== */
+  --check-ok-bg: #e6f4ea;
+  --check-ok-fg: #1e7a3b;
+  --check-ok-border: #b7dfc3;
+  --check-err-bg: #fce4e4;
+  --check-err-fg: #a02020;
+  --check-err-border: #f0b7b7;
+
+  /* ===== Отладчик ===== */
+  --var-name: #5a3d00;
+  --var-value: #0a6640;
+
+  /* ===== Metrics ===== */
+  --metrics-check: #396cd8;
+  --metrics-check-partial: #999999;
+
+  /* ===== Menubar (не зависит от темы) ===== */
+  --menubar-bg: #2f2f2f;
+  --menubar-fg: #f0f0f0;
+  --menubar-fg-muted: #c0c0c0;
+  --menubar-hover: #444444;
+  --menubar-shortcut-hover: #dde4ff;
+
+  /* ===== Тени и радиусы ===== */
+  --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.3);
+  --shadow-backdrop: rgba(0, 0, 0, 0.35);
+  --radius-sm: 4px;
+  --radius-md: 8px;
 }

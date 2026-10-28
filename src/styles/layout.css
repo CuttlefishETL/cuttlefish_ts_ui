@@ -39,5 +39,5 @@
 
 .splitter:hover::before,
 .splitter.active::before {
-  background-color: #396cd8;
+  background-color: var(--accent);
 }

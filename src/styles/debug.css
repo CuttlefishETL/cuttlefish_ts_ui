@@ -3,7 +3,7 @@
   flex-direction: row;
   height: 100%;
   min-height: 0;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid var(--border);
 }
 
 .debug-panel {
@@ -12,7 +12,7 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  background-color: #f5f5f5;
+  background-color: var(--bg-debug-panel);
 }
 
 .debug-panel-header {
@@ -23,19 +23,19 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #666;
-  border-bottom: 1px solid #ccc;
-  background-color: #e8e8e8;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-debug-header);
   flex-shrink: 0;
 }
 
 .debug-panel-count {
   margin-left: 6px;
-  background-color: #d02020;
-  color: #ffffff;
+  background-color: var(--danger-strong);
+  color: var(--fg-inverse);
   font-size: 10px;
   padding: 1px 5px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   min-width: 16px;
   text-align: center;
   line-height: 1.3;
@@ -46,12 +46,12 @@
   overflow: auto;
   padding: 4px 8px;
   font-size: 12px;
-  font-family: "Fira Code", Consolas, Monaco, monospace;
-  color: #222;
+  font-family: var(--font-mono);
+  color: var(--fg-strong);
 }
 
 .debug-empty {
-  color: #888;
+  color: var(--fg-dim);
   font-style: italic;
   padding: 6px;
 }
@@ -66,11 +66,11 @@
 }
 
 .stack-frame:hover {
-  background-color: #e4e4e4;
+  background-color: var(--bg-hover);
 }
 
 .stack-frame.current {
-  background-color: #dce6fb;
+  background-color: var(--bg-stack-current);
 }
 
 .stack-frame-name {
@@ -80,7 +80,7 @@
 }
 
 .stack-frame-loc {
-  color: #888;
+  color: var(--fg-dim);
   flex-shrink: 0;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .message-time {
-  color: #999;
+  color: var(--fg-subtle);
   flex-shrink: 0;
   font-size: 11px;
 }
@@ -108,12 +108,12 @@
 }
 
 .var-name {
-  color: #5a3d00;
+  color: var(--var-name);
   font-weight: 500;
 }
 
 .var-value {
-  color: #0a6640;
+  color: var(--var-value);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -121,7 +121,7 @@
 }
 
 .var-type {
-  color: #888;
+  color: var(--fg-dim);
   font-size: 11px;
   flex-shrink: 0;
 }
@@ -140,13 +140,13 @@
 }
 
 .bp-tree-folder:hover {
-  background-color: #e4e4e4;
+  background-color: var(--bg-hover);
 }
 
 .bp-tree-chevron {
   width: 12px;
   text-align: center;
-  color: #666;
+  color: var(--fg-muted);
   flex-shrink: 0;
   font-size: 11px;
 }
@@ -164,16 +164,16 @@
   gap: 6px;
   padding: 3px 8px 3px 0;
   user-select: none;
-  color: #333;
+  color: var(--fg);
 }
 
 .bp-tree-file-count {
   flex-shrink: 0;
-  background-color: #d02020;
-  color: #ffffff;
+  background-color: var(--danger-strong);
+  color: var(--fg-inverse);
   font-size: 10px;
   padding: 1px 5px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   min-width: 16px;
   text-align: center;
   line-height: 1.3;
@@ -189,7 +189,7 @@
 .bp-header-btn {
   background: none;
   border: 1px solid transparent;
-  color: #666;
+  color: var(--fg-muted);
   cursor: pointer;
   padding: 2px 6px;
   font-size: 12px;
@@ -200,8 +200,8 @@
 }
 
 .bp-header-btn:hover:not(:disabled) {
-  background-color: #ddd;
-  color: #222;
+  background-color: var(--bg-hover);
+  color: var(--fg-strong);
 }
 
 .bp-header-btn:disabled {
@@ -210,8 +210,8 @@
 }
 
 .bp-header-btn.danger:hover:not(:disabled) {
-  background-color: #fce4e4;
-  color: #d02020;
+  background-color: var(--danger-bg);
+  color: var(--danger-strong);
 }
 
 .bp-tree-line {
@@ -221,26 +221,26 @@
   padding: 2px 8px 2px 0;
   cursor: pointer;
   border-radius: 3px;
-  color: #333;
+  color: var(--fg);
 }
 
 .bp-tree-line:hover {
-  background-color: #e4e4e4;
+  background-color: var(--bg-hover);
 }
 
 .bp-tree-line-dot {
-  color: #d02020;
+  color: var(--danger-strong);
   font-size: 10px;
   line-height: 1;
   flex-shrink: 0;
 }
 
 .bp-tree-line.disabled .bp-tree-line-text {
-  color: #999;
+  color: var(--fg-subtle);
 }
 
 .bp-tree-line.disabled .bp-tree-line-dot {
-  color: #d02020;
+  color: var(--danger-strong);
   opacity: 0.4;
 }
 
@@ -252,7 +252,7 @@
 .bp-tree-remove {
   background: none;
   border: none;
-  color: #888;
+  color: var(--fg-dim);
   cursor: pointer;
   padding: 0 4px;
   font-size: 13px;
@@ -263,8 +263,8 @@
 }
 
 .bp-tree-remove:hover {
-  color: #d02020;
-  background-color: rgba(208, 32, 32, 0.1);
+  color: var(--danger-strong);
+  background-color: var(--danger-hover-bg);
 }
 
 .cm-breakpoint-gutter {
@@ -279,12 +279,12 @@
 }
 
 .cm-breakpoint-dot {
-  color: #d02020;
+  color: var(--danger-strong);
   font-size: 12px;
   line-height: 1;
 }
 
 .cm-breakpoint-dot.disabled {
-  color: #d02020;
+  color: var(--danger-strong);
   opacity: 0.5;
 }

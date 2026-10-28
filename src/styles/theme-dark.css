@@ -1,362 +1,65 @@
 @media (prefers-color-scheme: dark) {
   :root {
-    --fg: #f6f6f6;
+    /* Фоны */
     --bg: #2f2f2f;
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  .menu-file-name {
-    color: #999;
-  }
-
-  .menu-dropdown {
-    background-color: #2a2a2a;
-    color: #f6f6f6;
-    border-color: #555;
-  }
-
-  .menu-dropdown-item:hover {
-    background-color: #396cd8;
-    color: #ffffff;
-  }
-
-  .menu-dropdown-shortcut {
-    color: #aaa;
-  }
-
-  .menu-dropdown-separator {
-    background-color: #444;
-  }
-
-  .menu-dropdown-section {
-    color: #999;
-  }
-
-  .sidebar {
-    background-color: #2a2a2a;
-    border-right-color: #444;
-  }
-
-  .sidebar-toolbar {
-    border-bottom-color: #444;
-  }
-
-  .toolbar-btn {
-    background-color: #333;
-    border-color: #555;
-    color: #eee;
-  }
-
-  .toolbar-btn:hover:not(:disabled) {
-    background-color: #444;
-    border-color: #777;
-  }
-
-  .toolbar-btn.danger {
-    color: #ff8080;
-  }
-
-  .toolbar-btn.danger:hover:not(:disabled) {
-    background-color: #5a2020;
-    border-color: #ff8080;
-  }
-
-  .server-item:hover {
-    background-color: #3a3a3a;
-  }
-
-  .server-item.active {
-    background-color: #396cd8;
-    color: #fff;
-  }
-
-  .server-status.unknown {
-    background-color: #555;
-  }
-
-  .tabs-panel {
-    background-color: #1e1e1e;
-  }
-
-  .tabs-bar {
-    background-color: #333;
-    border-bottom-color: #444;
-  }
-
-  .tab {
-    background-color: #2a2a2a;
-    border-right-color: #444;
-  }
-
-  .tab.active {
-    background-color: #1e1e1e;
-  }
-
-  .tab-close {
-    color: #aaa;
-  }
-
-  .sub-tabs {
-    background-color: #252525;
-    border-bottom-color: #444;
-  }
-
-  .sub-tab {
-    color: #ccc;
-  }
-
-  .sub-tab:hover {
-    background-color: #333;
-  }
-
-  .field label {
-    color: #aaa;
-  }
-
-  .field input {
-    background-color: #2a2a2a;
-    border-color: #555;
-    color: #f6f6f6;
-  }
-
-  .field input:focus {
-    border-color: #6f8cff;
-  }
-
-  .field input:read-only {
-    background-color: #222;
-    color: #999;
-  }
-
-  .check-result.ok {
-    background-color: #1e3a28;
-    color: #a5d6b5;
-    border-color: #2f6a44;
-  }
-
-  .check-result.err {
-    background-color: #3a1e1e;
-    color: #f0a5a5;
-    border-color: #6a2f2f;
-  }
-
-  .btn {
-    background-color: #333;
-    border-color: #555;
-    color: #eee;
-  }
-
-  .btn:hover:not(:disabled) {
-    background-color: #444;
-    border-color: #777;
-  }
-
-  .btn.primary {
-    background-color: #396cd8;
-    border-color: #396cd8;
-    color: #fff;
-  }
-
-  .btn.primary:hover:not(:disabled) {
-    background-color: #2f5bc0;
-    border-color: #2f5bc0;
-  }
-
-  .btn.danger {
-    color: #ff8080;
-  }
-
-  .btn.danger:hover:not(:disabled) {
-    background-color: #4a2020;
-    border-color: #ff8080;
-  }
-
-  .modal {
-    background-color: #2a2a2a;
-    color: #f6f6f6;
-  }
-
-  .about-key {
-    color: #999;
-  }
-
-  .context-menu {
-    background-color: #2a2a2a;
-    color: #f6f6f6;
-    border-color: #555;
-  }
-
-  .scripts-toolbar {
-    background-color: #252525;
-    border-bottom-color: #444;
-  }
-
-  .scripts-toolbar-divider {
-    background-color: #444;
-  }
-
-  .scripts-toolbar-status {
-    color: #999;
-  }
-
-  .scripts-tree {
-    background-color: #2a2a2a;
-  }
-
-  .tree-folder:hover,
-  .tree-file:hover {
-    background-color: #3a3a3a;
-  }
-
-  .tree-chevron {
-    color: #999;
-  }
-
-  .tree-file.active {
-    background-color: #396cd8;
-    color: #fff;
-  }
-
-  .scripts-editors {
-    background-color: #1e1e1e;
-  }
-
-  .scripts-tabs-bar {
-    background-color: #333;
-    border-bottom-color: #444;
-  }
-
-  .script-tab {
-    background-color: #2a2a2a;
-    border-right-color: #444;
-  }
-
-  .script-tab.active {
-    background-color: #1e1e1e;
-  }
-
-  .debug-panels {
-    border-top-color: #444;
-  }
-
-  .debug-panel {
-    background-color: #252525;
-  }
-
-  .debug-panel-header {
-    background-color: #2f2f2f;
-    border-bottom-color: #444;
-    color: #aaa;
-  }
-
-  .debug-panel-body {
-    color: #ddd;
-  }
-
-  .debug-empty {
-    color: #888;
-  }
-
-  .stack-frame:hover {
-    background-color: #333;
-  }
-
-  .stack-frame.current {
-    background-color: #2a3a5a;
-  }
-
-  .stack-frame-loc {
-    color: #888;
-  }
-
-  .message-time {
-    color: #777;
-  }
-
-  .var-name {
-    color: #e0c48a;
-  }
-
-  .var-value {
-    color: #8fd4a4;
-  }
-
-  .var-type {
-    color: #888;
-  }
-
-  .bp-tree-folder:hover,
-  .bp-tree-line:hover {
-    background-color: #333;
-  }
-
-  .bp-tree-chevron {
-    color: #999;
-  }
-
-  .bp-tree-file {
-    color: #ddd;
-  }
-
-  .bp-tree-line {
-    color: #ddd;
-  }
-
-  .bp-tree-remove {
-    color: #666;
-  }
-
-  .bp-tree-remove:hover {
-    color: #ff6060;
-    background-color: rgba(255, 96, 96, 0.15);
-  }
-
-  .bp-header-btn {
-    color: #aaa;
-  }
-
-  .bp-header-btn:hover:not(:disabled) {
-    background-color: #444;
-    color: #fff;
-  }
-
-  .bp-header-btn.danger:hover:not(:disabled) {
-    background-color: #4a2020;
-    color: #ff8080;
-  }
-
-  .bp-tree-line.disabled .bp-tree-line-text {
-    color: #666;
-  }
-
-  .server-item.drag-over {
-    background-color: #2a3a5a;
-    outline-color: #6f8cff;
-  }
-
-  .server-list.drag-over {
-    background-color: #232a3a;
-  }
-
-  .metrics-header {
-    color: #aaa;
-    border-bottom-color: #444;
-  }
-
-  .metrics-row:hover {
-    background-color: #333;
-  }
-
-  .metrics-chevron {
-    color: #aaa;
-  }
-
-  .metrics-check {
-    accent-color: #6f8cff;
-  }
-
-  input.metrics-check--partial {
-    accent-color: #666;
+    --bg-sidebar: #2a2a2a;
+    --bg-panel: #1e1e1e;
+    --bg-tabbar: #333333;
+    --bg-tab: #2a2a2a;
+    --bg-tab-active: #1e1e1e;
+    --bg-subtabs: #252525;
+    --bg-elevated: #2a2a2a;
+    --bg-hover: #3a3a3a;
+    --bg-hover-subtle: #333333;
+    --bg-button: #333333;
+    --bg-button-hover: #444444;
+    --bg-toolbar: #252525;
+    --bg-input: #2a2a2a;
+    --bg-input-readonly: #222222;
+    --bg-debug-panel: #252525;
+    --bg-debug-header: #2f2f2f;
+    --bg-stack-current: #2a3a5a;
+    --bg-drag-over: #2a3a5a;
+    --bg-drag-over-list: #232a3a;
+
+    /* Текст */
+    --fg: #f6f6f6;
+    --fg-strong: #dddddd;
+    --fg-label: #aaaaaa;
+    --fg-muted: #aaaaaa;
+    --fg-dim: #888888;
+    --fg-subtle: #777777;
+    --fg-inverse: #ffffff;
+
+    /* Акцент и семантика */
+    --accent: #396cd8;
+    --accent-hover: #2f5bc0;
+    --accent-focus: #6f8cff;
+    --danger: #ff8080;
+    --danger-bg: #4a2020;
+    --danger-strong: #d02020;
+    --danger-hover-bg: rgba(255, 96, 96, 0.15);
+    --status-unknown: #555555;
+
+    /* Границы */
+    --border: #444444;
+    --border-subtle: #555555;
+    --border-strong: #777777;
+
+    /* Check-result */
+    --check-ok-bg: #1e3a28;
+    --check-ok-fg: #a5d6b5;
+    --check-ok-border: #2f6a44;
+    --check-err-bg: #3a1e1e;
+    --check-err-fg: #f0a5a5;
+    --check-err-border: #6a2f2f;
+
+    /* Отладчик */
+    --var-name: #e0c48a;
+    --var-value: #8fd4a4;
+
+    /* Metrics */
+    --metrics-check: #6f8cff;
+    --metrics-check-partial: #666666;
   }
 }
