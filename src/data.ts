@@ -46,3 +46,38 @@ export function createFolder(): ServerFolder {
     children: [],
   };
 }
+
+import type { MetricNode } from "./types";
+
+export const METRIC_NAMES: string[] = [
+  "system.cpu.usage",
+  "system.cpu.system",
+  "system.memory.used",
+  "system.memory.total",
+  "system.disk.read",
+  "system.disk.write",
+  "system.network.rx",
+  "system.network.tx",
+  "app.http.requests",
+  "app.http.errors",
+  "app.http.latency_p99",
+  "etl.jobs.executions",
+  "etl.jobs.failures",
+  "etl.rows.processed",
+];
+
+export const DEFAULT_ENABLED_METRICS: string[] = [
+  // system — включена целиком (все 8 листьев)
+  "system.cpu.usage",
+  "system.cpu.system",
+  "system.memory.used",
+  "system.memory.total",
+  "system.disk.read",
+  "system.disk.write",
+  "system.network.rx",
+  "system.network.tx",
+  // app — частично (1 из 3)
+  "app.http.requests",
+  // etl — частично (1 из 3)
+  "etl.jobs.executions",
+];

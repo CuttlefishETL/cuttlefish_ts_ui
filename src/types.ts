@@ -30,3 +30,20 @@ export interface SubTab {
   id: TabId;
   name: string;
 }
+
+export interface MetricLeaf {
+  kind: "metric";
+  id: string;
+  name: string;
+}
+
+export interface MetricGroup {
+  kind: "group";
+  id: string;
+  name: string;
+  children: MetricNode[];
+}
+
+export type MetricNode = MetricLeaf | MetricGroup;
+
+export type MetricCheckState = "checked" | "unchecked" | "indeterminate";

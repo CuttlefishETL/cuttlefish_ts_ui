@@ -338,4 +338,25 @@
   .server-list.drag-over {
     background-color: #232a3a;
   }
+
+  .metrics-header {
+    color: #aaa;
+    border-bottom-color: #444;
+  }
+
+  .metrics-row:hover {
+    background-color: #333;
+  }
+
+  .metrics-chevron {
+    color: #aaa;
+  }
+
+  .metrics-check {
+    accent-color: #6f8cff;
+  }
+
+  input.metrics-check--partial {
+    accent-color: #666;
+  }
 }

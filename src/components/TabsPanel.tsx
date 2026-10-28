@@ -63,7 +63,7 @@ export function TabsPanel({
       case "plugins":
         return <PluginsTab />;
       case "metrics":
-        return <MetricsTab />;
+        return <MetricsTab key={server.id} />;
       case "scripts":
         return <ScriptsTab />;
     }

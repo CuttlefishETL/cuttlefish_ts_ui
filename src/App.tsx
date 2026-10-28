@@ -15,7 +15,6 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { INITIAL_SERVERS, SETTINGS_TABS, createServer, createFolder } from "./data";
 import type { Server, ServerNode, TabId } from "./types";
 import { checkConnection, type CheckStatus } from "./checkConnection";
-import { baseNameOf } from "./pathUtils";
 
 import {
   loadAppSettings,
