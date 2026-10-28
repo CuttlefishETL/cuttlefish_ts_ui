@@ -47,7 +47,6 @@ export function createFolder(): ServerFolder {
   };
 }
 
-import type { MetricNode } from "./types";
 
 export const METRIC_NAMES: string[] = [
   "system.cpu.usage",
