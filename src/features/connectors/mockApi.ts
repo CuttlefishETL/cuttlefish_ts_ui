@@ -183,6 +183,7 @@ const INITIAL_INSTANCES: ConnectorInstance[] = [
     description: "Основной REST API",
     direction: "Duplex",
     tags: ["api", "prod"],
+    metadata: { folder: "prod" },
     params: {
       base_url: "https://api.example.com",
       timeout_sec: 30,
@@ -197,6 +198,7 @@ const INITIAL_INSTANCES: ConnectorInstance[] = [
     description: "Входящий HTTP-эндпоинт",
     direction: "Duplex",
     tags: ["api"],
+    metadata: { folder: "prod/api" },
     params: {
       lua_script: "handler.lua",
       allowed_methods: "GET,POST",
@@ -211,6 +213,7 @@ const INITIAL_INSTANCES: ConnectorInstance[] = [
     description: "Основная БД",
     direction: "Source",
     tags: ["prod", "db"],
+    metadata: { folder: "prod" },
     params: {
       driver: "postgres",
       host: "db.local",
@@ -229,6 +232,7 @@ const INITIAL_INSTANCES: ConnectorInstance[] = [
     description: "Кэш на redb",
     direction: "Duplex",
     tags: ["cache"],
+    metadata: { folder: "dev" },
     params: {
       path: "/var/cache/cf.redb",
       read_only: false,
@@ -238,6 +242,7 @@ const INITIAL_INSTANCES: ConnectorInstance[] = [
 
 interface MockState {
   items: ConnectorInstance[];
+  folders: Set<string>;
 }
 
 function computeStatus(s: MockState): ConnectorStatus {
@@ -249,13 +254,19 @@ function computeStatus(s: MockState): ConnectorStatus {
   };
 }
 
+function clone(c: ConnectorInstance): ConnectorInstance {
+  return {
+    ...c,
+    params: { ...c.params },
+    tags: c.tags ? [...c.tags] : undefined,
+    metadata: c.metadata ? { ...c.metadata } : undefined,
+  };
+}
+
 export function createMockConnectorsApi(): ConnectorsApi {
   const state: MockState = {
-    items: INITIAL_INSTANCES.map((c) => ({
-      ...c,
-      params: { ...c.params },
-      tags: c.tags ? [...c.tags] : undefined,
-    })),
+    items: INITIAL_INSTANCES.map(clone),
+    folders: new Set(["prod", "prod/api", "dev"]),
   };
 
   return {
@@ -263,21 +274,21 @@ export function createMockConnectorsApi(): ConnectorsApi {
       await delay(150);
       return Object.values(TEMPLATES).map((t) => ({ ...t }));
     },
+
     async list() {
       await delay(200);
-      return state.items.map((c) => ({
-        ...c,
-        params: { ...c.params },
-        tags: c.tags ? [...c.tags] : undefined,
-      }));
+      return state.items.map(clone);
     },
+
     async status() {
       await delay(100);
       return computeStatus(state);
     },
+
     async reload() {
       await delay(300);
     },
+
     async create(input: ConnectorInput) {
       await delay(300);
       if (state.items.some((c) => c.name === input.name)) {
@@ -291,17 +302,23 @@ export function createMockConnectorsApi(): ConnectorsApi {
         direction: input.direction as Direction,
         params: { ...input.params },
         tags: input.tags,
+        metadata: input.metadata ? { ...input.metadata } : undefined,
       };
       state.items.push(created);
-      return created;
+      return clone(created);
     },
+
     async update(name: string, input: ConnectorInput) {
       await delay(300);
       const idx = state.items.findIndex((c) => c.name === name);
       if (idx < 0) throw new Error("Коннектор не найден");
-      if (name !== input.name && state.items.some((c) => c.name === input.name)) {
+      if (
+        name !== input.name &&
+        state.items.some((c) => c.name === input.name)
+      ) {
         throw new Error("Коннектор с таким именем уже существует");
       }
+      const prev = state.items[idx];
       const updated: ConnectorInstance = {
         name: input.name,
         type: input.type,
@@ -310,16 +327,23 @@ export function createMockConnectorsApi(): ConnectorsApi {
         direction: input.direction as Direction,
         params: { ...input.params },
         tags: input.tags,
+        metadata: input.metadata
+          ? { ...input.metadata }
+          : prev.metadata
+            ? { ...prev.metadata }
+            : undefined,
       };
       state.items[idx] = updated;
-      return updated;
+      return clone(updated);
     },
+
     async remove(name: string) {
       await delay(250);
       const idx = state.items.findIndex((c) => c.name === name);
       if (idx < 0) throw new Error("Коннектор не найден");
       state.items.splice(idx, 1);
     },
+
     async test(name: string) {
       await delay(600);
       const item = state.items.find((c) => c.name === name);
@@ -329,6 +353,20 @@ export function createMockConnectorsApi(): ConnectorsApi {
       }
       if (item.type === "sql" && !item.params.password) {
         throw new Error("Не удалось подключиться: отсутствует пароль");
+      }
+    },
+
+    async listFolders() {
+      await delay(100);
+      return Array.from(state.folders).sort();
+    },
+
+    async saveFolders(paths: string[]) {
+      await delay(100);
+      state.folders.clear();
+      for (const p of paths) {
+        const trimmed = p.trim().replace(/\/+$/, "");
+        if (trimmed) state.folders.add(trimmed);
       }
     },
   };

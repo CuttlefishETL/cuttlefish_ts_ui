@@ -19,6 +19,11 @@ export interface ConnectorInput {
   params: Record<string, unknown>;
   tags?: string[];
   direction: string;
+  metadata?: Record<string, string>;
+}
+
+function foldersKey(baseUrl: string): string {
+  return `cuttlefish.connectors.folders.${baseUrl}`;
 }
 
 export function createConnectorsApi(baseUrl: string) {
@@ -74,6 +79,21 @@ export function createConnectorsApi(baseUrl: string) {
       throw new Error(
         "Функция тестирования соединения недоступна в текущей версии ядра",
       );
+    },
+    async listFolders(): Promise<string[]> {
+      const raw = localStorage.getItem(foldersKey(baseUrl));
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed)
+          ? parsed.filter((x) => typeof x === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    },
+    async saveFolders(paths: string[]): Promise<void> {
+      localStorage.setItem(foldersKey(baseUrl), JSON.stringify(paths));
     },
   };
 }

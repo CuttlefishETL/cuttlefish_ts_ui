@@ -37,7 +37,7 @@
 .connectors-list {
   display: flex;
   flex-direction: column;
-  flex: 0 0 440px;
+  flex: 0 0 520px;
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -45,11 +45,16 @@
   background-color: var(--bg);
 }
 
-.connectors-list-header {
+.connectors-list-header,
+.connectors-row {
   display: grid;
-  grid-template-columns: 1fr 50px minmax(80px, 1fr) 36px;
+  grid-template-columns: 1fr 100px 50px minmax(80px, 1fr) 36px;
   gap: 8px;
   padding: 6px 10px;
+  align-items: center;
+}
+
+.connectors-list-header {
   background-color: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   font-size: 12px;
@@ -67,18 +72,22 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  position: relative;
 }
 
 .connectors-row {
-  display: grid;
-  grid-template-columns: 1fr 50px minmax(80px, 1fr) 36px;
-  gap: 8px;
-  padding: 4px 10px;
   cursor: pointer;
-  align-items: center;
   font-size: 13px;
   height: 28px;
   box-sizing: border-box;
+}
+
+.connectors-row[draggable="true"] {
+  cursor: grab;
+}
+
+.connectors-row[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .connectors-row:hover {
@@ -88,6 +97,13 @@
 .connectors-row.is-selected {
   background-color: var(--accent);
   color: var(--fg-inverse);
+}
+
+.connectors-row.is-drop-target {
+  background-color: var(--accent);
+  color: var(--fg-inverse);
+  outline: 1px dashed var(--fg-inverse);
+  outline-offset: -2px;
 }
 
 .connectors-cell {
@@ -101,6 +117,12 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.connectors-cell.type {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
 }
 
 .connectors-cell.enabled {
@@ -117,7 +139,9 @@
   font-size: 14px;
 }
 
-.connectors-row.is-selected .connectors-cell.tags {
+.connectors-row.is-selected .connectors-cell.type,
+.connectors-row.is-selected .connectors-cell.tags,
+.connectors-row.is-selected .connectors-cell.enabled {
   color: var(--fg-inverse);
 }
 
@@ -148,6 +172,8 @@
 
 .connectors-icon {
   flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .connectors-label {
@@ -164,7 +190,19 @@
   cursor: pointer;
 }
 
-/* -------- Правая панель: свойства -------- */
+.connectors-drop-root {
+  padding: 8px;
+  margin: 4px 8px;
+  text-align: center;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 12px;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* -------- Правая панель -------- */
 
 .connectors-props {
   flex: 1;
@@ -196,6 +234,13 @@
   min-height: 0;
 }
 
+.props {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 .props-header {
   padding: 8px 14px;
   background-color: var(--bg-toolbar);
@@ -203,6 +248,12 @@
   font-weight: 600;
   font-size: 13px;
   color: var(--fg);
+}
+
+.props-header-folder {
+  font-weight: 400;
+  color: var(--fg-muted);
+  font-size: 12px;
 }
 
 .props-body {
@@ -334,6 +385,33 @@
   background-color: var(--bg-toolbar);
 }
 
+.prop-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+
+.prop-label {
+  flex: 0 0 130px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--fg-label);
+  font-weight: 500;
+  padding-top: 6px;
+}
+
+.prop-value {
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.prop-value.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
 .connectors-toast {
   position: fixed;
   bottom: 24px;
@@ -346,4 +424,10 @@
   box-shadow: var(--shadow-md);
   max-width: 420px;
   font-size: 13px;
+}
+
+.field-error {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--danger);
 }

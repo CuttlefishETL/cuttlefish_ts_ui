@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectorInput } from "./api";
 import type {
   ConnectorInstance,
@@ -11,6 +11,7 @@ interface Props {
   initialValue: ConnectorInstance | null;
   templates: ConnectorTemplate[];
   templatesByType: Record<string, ConnectorTemplate>;
+  folderPath?: string;
   onSubmit: (input: ConnectorInput) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
@@ -22,6 +23,7 @@ export function ConnectorProperties({
   initialValue,
   templates,
   templatesByType,
+  folderPath,
   onSubmit,
   onCancel,
   saving,
@@ -35,11 +37,23 @@ export function ConnectorProperties({
   );
   const [enabled, setEnabled] = useState(initialValue?.enabled ?? true);
   const [tags, setTags] = useState((initialValue?.tags ?? []).join(", "));
-  const [description, setDescription] = useState(initialValue?.description ?? "");
+  const [description, setDescription] = useState(
+    initialValue?.description ?? "",
+  );
   const [params, setParams] = useState<Record<string, unknown>>(
     initialValue?.params ?? {},
   );
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // Черновик: если пользователь не трогал чекбокс в форме,
+  // синхронизируем его с изменением из списка.
+  const enabledDirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabledDirtyRef.current) {
+      setEnabled(initialValue?.enabled ?? true);
+    }
+  }, [initialValue?.enabled]);
 
   const currentTemplate = type ? templatesByType[type] : null;
 
@@ -48,7 +62,7 @@ export function ConnectorProperties({
     setParams((prev) => {
       const next: Record<string, unknown> = {};
       for (const [key, meta] of Object.entries(currentTemplate.params)) {
-        next[key] = key in prev ? prev[key] : (meta.default ?? "");
+        next[key] = key in prev ? prev[key] : meta.default ?? "";
       }
       return next;
     });
@@ -128,6 +142,7 @@ export function ConnectorProperties({
       description: description.trim() || undefined,
       tags: tagsArr.length ? tagsArr : undefined,
       params: normalizedParams,
+      metadata: initialValue?.metadata,
     });
   };
 
@@ -135,6 +150,12 @@ export function ConnectorProperties({
     <form className="props-panel" onSubmit={handleSubmit}>
       <div className="props-header">
         {isEdit ? `Коннектор «${initialValue.name}»` : "Новый коннектор"}
+        {!isEdit && folderPath && (
+          <span className="props-header-folder"> → {folderPath}</span>
+        )}
+        {!isEdit && !folderPath && (
+          <span className="props-header-folder"> → корень</span>
+        )}
       </div>
 
       <div className="props-body">
@@ -154,7 +175,9 @@ export function ConnectorProperties({
             onChange={(e) => setType(e.target.value)}
             disabled={saving || isEdit}
             title={
-              isEdit ? "Тип нельзя изменить у существующего коннектора" : undefined
+              isEdit
+                ? "Тип нельзя изменить у существующего коннектора"
+                : undefined
             }
           >
             <option value="">— выберите —</option>
@@ -188,7 +211,10 @@ export function ConnectorProperties({
           <input
             type="checkbox"
             checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
+            onChange={(e) => {
+              setEnabled(e.target.checked);
+              enabledDirtyRef.current = true;
+            }}
             disabled={saving}
             className="props-checkbox"
           />
@@ -236,7 +262,12 @@ export function ConnectorProperties({
         <button className="btn primary" type="submit" disabled={saving}>
           Сохранить
         </button>
-        <button className="btn" type="button" onClick={onCancel} disabled={saving}>
+        <button
+          className="btn"
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+        >
           Отмена
         </button>
       </div>
@@ -251,7 +282,12 @@ interface FieldRowProps {
   children: React.ReactNode;
 }
 
-function FieldRow({ label, required, align = "center", children }: FieldRowProps) {
+function FieldRow({
+  label,
+  required,
+  align = "center",
+  children,
+}: FieldRowProps) {
   return (
     <div className={"props-field align-" + align}>
       <label>
@@ -270,14 +306,19 @@ interface ParamRowProps {
   disabled: boolean;
 }
 
-function ParamRow({ name, meta, value, onChange, disabled }: ParamRowProps) {
-  const label = meta.description ? `${name}` : name;
+function ParamRow({
+  name,
+  meta,
+  value,
+  onChange,
+  disabled,
+}: ParamRowProps) {
   const hint = meta.description ? (
     <div className="props-hint">{meta.description}</div>
   ) : null;
 
   return (
-    <FieldRow label={label} required={meta.required} align="top">
+    <FieldRow label={name} required={meta.required} align="top">
       {renderControl()}
       {hint}
     </FieldRow>
