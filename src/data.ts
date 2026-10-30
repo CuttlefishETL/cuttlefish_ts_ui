@@ -6,6 +6,7 @@ export const SETTINGS_TABS: SubTab[] = [
   { id: "plugins", name: "Плагины" },
   { id: "metrics", name: "Метрики" },
   { id: "scripts", name: "Scripts" },
+  { id: "cron", name: "Расписания" },
 ];
 
 export const INITIAL_SERVERS: ServerNode[] = [

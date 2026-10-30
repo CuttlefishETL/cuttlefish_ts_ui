@@ -1,0 +1,338 @@
+.cron-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.cron-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.cron-spacer {
+  flex: 1;
+}
+
+.cron-stats {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.cron-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background-color: var(--bg);
+}
+
+.cron-header,
+.cron-row {
+  display: grid;
+  grid-template-columns:
+    minmax(140px, 1.4fr)
+    minmax(140px, 1.2fr)
+    minmax(120px, 1fr)
+    100px
+    50px
+    minmax(100px, 0.8fr);
+  gap: 8px;
+  padding: 6px 10px;
+  align-items: center;
+}
+
+.cron-header {
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  user-select: none;
+}
+
+.cron-header .col-enabled {
+  text-align: center;
+}
+
+.cron-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.cron-row {
+  padding: 4px 10px;
+  height: 28px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cron-row:hover {
+  background-color: var(--bg-hover-subtle);
+}
+
+.cron-row.is-selected {
+  background-color: var(--accent);
+  color: var(--fg-inverse);
+}
+
+.cron-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.cron-cell.name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cron-cell.schedule {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.cron-cell.script {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.cron-cell.uid {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.cron-cell.section {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.cron-cell.enabled {
+  text-align: center;
+}
+
+.cron-row.is-selected .cron-cell.schedule,
+.cron-row.is-selected .cron-cell.script,
+.cron-row.is-selected .cron-cell.uid,
+.cron-row.is-selected .cron-cell.section {
+  color: var(--fg-inverse);
+}
+
+.cron-chevron {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.cron-row.is-selected .cron-chevron {
+  color: var(--fg-inverse);
+}
+
+.cron-chevron-placeholder {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.cron-icon {
+  flex-shrink: 0;
+}
+
+.cron-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cron-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.cron-hint {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* ---------- Диалог Cron ---------- */
+
+.cron-dialog {
+  min-width: 460px;
+  max-width: 560px;
+}
+
+.cron-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cron-dialog .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cron-dialog .field > label {
+  font-size: 12px;
+  color: var(--fg-label);
+  font-weight: 500;
+}
+
+.cron-dialog .req {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.cron-dialog input[type="text"],
+.cron-dialog textarea {
+  width: 100%;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg);
+  color: var(--fg);
+  box-sizing: border-box;
+}
+
+.cron-dialog input:focus,
+.cron-dialog textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.cron-dialog input:disabled,
+.cron-dialog textarea:disabled {
+  opacity: 0.6;
+}
+
+.cron-dialog textarea {
+  resize: vertical;
+  min-height: 52px;
+}
+
+.cron-dialog .mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.cron-dialog .field-hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.cron-dialog .field-with-button {
+  display: flex;
+  gap: 6px;
+}
+
+.cron-dialog .field-with-button input {
+  flex: 1;
+  min-width: 0;
+}
+
+.cron-dialog .checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cron-dialog .checkbox-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.cron-dialog .checkbox-field label {
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.cron-error {
+  color: var(--danger);
+  font-size: 12px;
+  padding: 6px 10px;
+  background-color: var(--danger-bg);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- Диалог выбора скрипта ---------- */
+
+.cron-script-modal {
+  min-width: 420px;
+  max-width: 560px;
+}
+
+.cron-script-tree {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 0;
+  max-height: 360px;
+  overflow-y: auto;
+  background-color: var(--bg);
+  margin-bottom: 4px;
+}
+
+.cron-script-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  height: 26px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cron-script-row:hover {
+  background-color: var(--bg-hover-subtle);
+}
+
+.cron-script-row.is-selected {
+  background-color: var(--accent);
+  color: var(--fg-inverse);
+}
+
+.cron-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background-color: var(--danger);
+  color: var(--fg-inverse);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  z-index: 1100;
+  box-shadow: var(--shadow-md);
+  max-width: 420px;
+  font-size: 13px;
+}
