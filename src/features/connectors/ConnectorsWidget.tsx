@@ -24,6 +24,7 @@ import {
   validateFolderName,
 } from "./types";
 import { PromptDialog } from "./PromptDialog";
+import { act, sep, useContextMenu } from "../../components/context-menu";
 import "./connectors.css";
 
 interface Props {
@@ -44,13 +45,9 @@ type ConfirmState =
   | { kind: "folder"; path: string }
   | null;
 
-interface ContextMenuState {
-  x: number;
-  y: number;
-  node: ConnectorTreeNode | null;  // null — правый клик по пустому месту
-}
-
 export function ConnectorsWidget({ api }: Props) {
+  const { openContextMenu } = useContextMenu();
+
   const {
     items,
     templates,
@@ -77,42 +74,15 @@ export function ConnectorsWidget({ api }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<ConfirmState>(null);
   const [prompt, setPrompt] = useState<PromptState>({ kind: "none" });
   const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const dragPayloadRef = useRef<DragPayload | null>(null);
   const dropCounterRef = useRef(0);
-  const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(id);
   }, [toast]);
-
-  // Закрытие контекстного меню: клик вне, Escape, прокрутка
-  useEffect(() => {
-    if (!contextMenu) return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(e.target as Node)
-      ) {
-        setContextMenu(null);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setContextMenu(null);
-    };
-    const onScroll = () => setContextMenu(null);
-    window.addEventListener("mousedown", onClickOutside);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      window.removeEventListener("mousedown", onClickOutside);
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll, true);
-    };
-  }, [contextMenu]);
 
   const tree = useMemo(
     () => buildConnectorTree(items, folders),
@@ -169,9 +139,7 @@ export function ConnectorsWidget({ api }: Props) {
 
   const handleCreateConnector = (folderOverride?: string) => {
     const folder =
-      folderOverride !== undefined
-        ? folderOverride
-        : selectedFolderPath ?? "";
+      folderOverride !== undefined ? folderOverride : selectedFolderPath ?? "";
     setCreating(true);
     setCreatingInFolder(folder);
     setSelectedKey(null);
@@ -224,9 +192,7 @@ export function ConnectorsWidget({ api }: Props) {
     if (err) setToast(err);
   };
 
-  const handleTest = async (target?: ConnectorInstance | null) => {
-    const c = target ?? selectedConnector;
-    if (!c) return;
+  const handleTest = async (c: ConnectorInstance) => {
     setBusy(true);
     try {
       await api.test(c.name);
@@ -249,17 +215,6 @@ export function ConnectorsWidget({ api }: Props) {
     } finally {
       setBusy(false);
     }
-  };
-
-  const openDeleteConfirm = (target: {
-    kind: "connector";
-    name: string;
-  } | {
-    kind: "folder";
-    path: string;
-  } | null) => {
-    if (!target) return;
-    setConfirmDelete(target);
   };
 
   const handleDeleteConfirm = async () => {
@@ -292,22 +247,12 @@ export function ConnectorsWidget({ api }: Props) {
     }
   };
 
-  const newFolderParent = (): string => {
-    if (selectedFolderPath !== null) return selectedFolderPath;
-    if (selectedConnector) return getConnectorFolder(selectedConnector);
-    return "";
-  };
-
-  const openCreateFolder = (parentOverride?: string) => {
-    const parent =
-      parentOverride !== undefined ? parentOverride : newFolderParent();
+  const openCreateFolder = (parent: string) => {
     setPrompt({ kind: "create-folder", parent });
   };
 
-  const openRenameFolder = (path?: string) => {
-    const target = path ?? selectedFolderPath;
-    if (target === null) return;
-    setPrompt({ kind: "rename-folder", path: target });
+  const openRenameFolder = (path: string) => {
+    setPrompt({ kind: "rename-folder", path });
   };
 
   const handlePromptSubmit = async (value: string) => {
@@ -456,95 +401,64 @@ export function ConnectorsWidget({ api }: Props) {
     await reload();
   };
 
-  // -------- Context menu --------
+  // -------- Контекстное меню --------
 
-  const openContextMenu = (e: React.MouseEvent, node: ConnectorTreeNode | null) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // если правый клик по элементу — выделяем его
-    if (node) {
-      if (node.type === "connector") {
-        setSelectedKey(node.key);
-        setCreating(false);
-        setCreatingInFolder("");
-      } else if (node.type === "folder") {
-        setSelectedKey(node.key);
-        setCreating(false);
-        setCreatingInFolder("");
-      }
+  const folderForNode = (node: ConnectorTreeNode | null): string => {
+    if (!node) return "";
+    if (node.type === "folder") return node.path;
+    if (node.type === "connector" && node.connector) {
+      return getConnectorFolder(node.connector);
     }
-    setContextMenu({ x: e.clientX, y: e.clientY, node });
+    return "";
   };
 
-  const closeContextMenu = () => setContextMenu(null);
+  const buildMenu = (node: ConnectorTreeNode | null) => {
+    const isFolder = node?.type === "folder";
+    const isConnector = node?.type === "connector";
+    const folder = folderForNode(node);
 
-  const handleContextCreateConnector = () => {
-    if (!contextMenu) return;
-    const n = contextMenu.node;
-    const folder =
-      n === null
-        ? ""
-        : n.type === "folder"
-          ? n.path
-          : n.connector
-            ? getConnectorFolder(n.connector)
-            : "";
-    closeContextMenu();
-    handleCreateConnector(folder);
+    return [
+      act("Создать коннектор", () => handleCreateConnector(folder), {
+        disabled: busy,
+      }),
+      act("Новая папка", () => openCreateFolder(folder), { disabled: busy }),
+      sep(),
+      act("Переименовать", () => openRenameFolder((node as any).path), {
+        disabled: !isFolder || busy,
+      }),
+      act(
+        "Удалить",
+        () => {
+          if (isConnector && node?.connector) {
+            setConfirmDelete({ kind: "connector", name: node.connector.name });
+          } else if (isFolder) {
+            setConfirmDelete({ kind: "folder", path: (node as any).path });
+          }
+        },
+        { danger: true, disabled: (!isFolder && !isConnector) || busy },
+      ),
+      sep(),
+      act(
+        "Тест",
+        () => {
+          if (node?.connector) void handleTest(node.connector);
+        },
+        { disabled: !isConnector || busy },
+      ),
+      act("Перезагрузить", () => void handleReload(), { disabled: busy }),
+    ];
   };
 
-  const handleContextCreateFolder = () => {
-    if (!contextMenu) return;
-    const n = contextMenu.node;
-    const parent =
-      n === null
-        ? ""
-        : n.type === "folder"
-          ? n.path
-          : n.connector
-            ? getConnectorFolder(n.connector)
-            : "";
-    closeContextMenu();
-    openCreateFolder(parent);
+  const openRowMenu = (e: React.MouseEvent, node: ConnectorTreeNode) => {
+    setSelectedKey(node.key);
+    setCreating(false);
+    setCreatingInFolder("");
+    openContextMenu(e, buildMenu(node));
   };
 
-  const handleContextRename = () => {
-    if (!contextMenu) return;
-    const n = contextMenu.node;
-    if (!n || n.type !== "folder") return;
-    closeContextMenu();
-    openRenameFolder(n.path);
+  const openBlankMenu = (e: React.MouseEvent) => {
+    openContextMenu(e, buildMenu(null));
   };
-
-  const handleContextDelete = () => {
-    if (!contextMenu) return;
-    const n = contextMenu.node;
-    closeContextMenu();
-    if (!n) return;
-    if (n.type === "connector" && n.connector) {
-      openDeleteConfirm({ kind: "connector", name: n.connector.name });
-    } else if (n.type === "folder") {
-      openDeleteConfirm({ kind: "folder", path: n.path });
-    }
-  };
-
-  const handleContextTest = () => {
-    if (!contextMenu) return;
-    const n = contextMenu.node;
-    closeContextMenu();
-    if (n && n.type === "connector" && n.connector) {
-      void handleTest(n.connector);
-    }
-  };
-
-  const handleContextReload = () => {
-    closeContextMenu();
-    void handleReload();
-  };
-
-  const menuNodeType = contextMenu?.node?.type ?? null;
-  const menuIsConnector = menuNodeType === "connector";
-  const menuIsFolder = menuNodeType === "folder";
 
   return (
     <div className="connectors-tab">
@@ -552,12 +466,12 @@ export function ConnectorsWidget({ api }: Props) {
         <button className="btn" onClick={() => handleCreateConnector()} disabled={busy}>
           Создать
         </button>
-        <button className="btn" onClick={() => openCreateFolder()} disabled={busy}>
+        <button className="btn" onClick={() => openCreateFolder("")} disabled={busy}>
           Новая папка
         </button>
         <button
           className="btn"
-          onClick={() => openRenameFolder()}
+          onClick={() => selectedFolderPath !== null && openRenameFolder(selectedFolderPath)}
           disabled={selectedFolderPath === null || busy}
         >
           Переименовать
@@ -566,10 +480,7 @@ export function ConnectorsWidget({ api }: Props) {
           className="btn danger"
           onClick={() => {
             if (selectedConnector) {
-              setConfirmDelete({
-                kind: "connector",
-                name: selectedConnector.name,
-              });
+              setConfirmDelete({ kind: "connector", name: selectedConnector.name });
             } else if (selectedFolderPath !== null) {
               setConfirmDelete({ kind: "folder", path: selectedFolderPath });
             }
@@ -580,7 +491,7 @@ export function ConnectorsWidget({ api }: Props) {
         </button>
         <button
           className="btn"
-          onClick={() => handleTest()}
+          onClick={() => selectedConnector && void handleTest(selectedConnector)}
           disabled={!selectedConnector || busy}
           title="Проверка соединения (в текущей версии ядра недоступна)"
         >
@@ -618,7 +529,7 @@ export function ConnectorsWidget({ api }: Props) {
             onDragOver={handleRootDragOver}
             onDragLeave={handleRootDragLeave}
             onDrop={handleRootDrop}
-            onContextMenu={(e) => openContextMenu(e, null)}
+            onContextMenu={openBlankMenu}
           >
             {loading && items.length === 0 && (
               <div className="connectors-hint">Загрузка…</div>
@@ -631,14 +542,11 @@ export function ConnectorsWidget({ api }: Props) {
                 </button>
               </div>
             )}
-            {!loading &&
-              !error &&
-              items.length === 0 &&
-              folders.length === 0 && (
-                <div className="connectors-hint">
-                  Коннекторы не найдены. Нажмите «Создать» или «Новая папка».
-                </div>
-              )}
+            {!loading && !error && items.length === 0 && folders.length === 0 && (
+              <div className="connectors-hint">
+                Коннекторы не найдены. Нажмите «Создать» или «Новая папка».
+              </div>
+            )}
 
             {rows.map(({ node, depth }) => {
               const isFolder = node.type === "folder";
@@ -662,7 +570,7 @@ export function ConnectorsWidget({ api }: Props) {
                   onDoubleClick={() => {
                     if (isFolder) toggleExpand(node.key);
                   }}
-                  onContextMenu={(e) => openContextMenu(e, node)}
+                  onContextMenu={(e) => openRowMenu(e, node)}
                   onDragStart={(e) => handleDragStart(e, node)}
                   onDragEnter={handleDragEnter}
                   onDragOver={(e) => handleDragOver(e, node)}
@@ -741,9 +649,7 @@ export function ConnectorsWidget({ api }: Props) {
 
           {!isFormOpen && selectedFolderPath !== null && (
             <div className="props">
-              <div className="props-header">
-                Папка «{selectedFolderPath}»
-              </div>
+              <div className="props-header">Папка «{selectedFolderPath}»</div>
               <div className="props-body">
                 <div className="prop-row">
                   <div className="prop-label">Путь</div>
@@ -815,10 +721,7 @@ export function ConnectorsWidget({ api }: Props) {
       )}
 
       {confirmDelete && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setConfirmDelete(null)}
-        >
+        <div className="modal-backdrop" onClick={() => setConfirmDelete(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>
               {confirmDelete.kind === "connector"
@@ -831,10 +734,7 @@ export function ConnectorsWidget({ api }: Props) {
                 : confirmDelete.path}
             </p>
             <div className="modal-actions">
-              <button
-                className="btn"
-                onClick={() => setConfirmDelete(null)}
-              >
+              <button className="btn" onClick={() => setConfirmDelete(null)}>
                 Отмена
               </button>
               <button
@@ -846,64 +746,6 @@ export function ConnectorsWidget({ api }: Props) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="context-menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <button
-            className="context-menu-item"
-            onClick={handleContextCreateConnector}
-            disabled={busy}
-          >
-            Создать коннектор
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={handleContextCreateFolder}
-            disabled={busy}
-          >
-            Новая папка
-          </button>
-
-          <div className="context-menu-sep" />
-
-          <button
-            className="context-menu-item"
-            onClick={handleContextRename}
-            disabled={!menuIsFolder || busy}
-          >
-            Переименовать
-          </button>
-          <button
-            className="context-menu-item danger"
-            onClick={handleContextDelete}
-            disabled={(!menuIsConnector && !menuIsFolder) || busy}
-          >
-            Удалить
-          </button>
-
-          <div className="context-menu-sep" />
-
-          <button
-            className="context-menu-item"
-            onClick={handleContextTest}
-            disabled={!menuIsConnector || busy}
-          >
-            Тест
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={handleContextReload}
-            disabled={busy}
-          >
-            Перезагрузить
-          </button>
         </div>
       )}
 
