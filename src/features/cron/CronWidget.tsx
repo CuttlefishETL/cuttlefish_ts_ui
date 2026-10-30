@@ -1,9 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CronApi } from "./api";
 import { useCron } from "./useCron";
-import { buildCronTree, flattenTree } from "./buildTree";
+import {
+  allSectionKeys,
+  buildCronTree,
+  canMoveSectionTo,
+  flattenTree,
+} from "./buildTree";
 import { CronDialog } from "./CronDialog";
-import type { CronEntry } from "./types";
+import type { CronEntry, CronTreeNode } from "./types";
+import {
+  getTaskSection,
+  sectionName,
+  validateSectionName,
+} from "./types";
+import { PromptDialog } from "../../components/PromptDialog";
 import { act, sep, useContextMenu } from "../../components/context-menu";
 import "./cron.css";
 
@@ -13,19 +30,52 @@ interface Props {
 
 type DialogState =
   | { kind: "none" }
-  | { kind: "create"; initial: CronEntry | null; isNew: true }
+  | { kind: "create"; initial: CronEntry | null; isNew: true; section: string }
   | { kind: "edit"; initial: CronEntry; isNew: false }
-  | { kind: "copy"; initial: CronEntry; isNew: true };
+  | { kind: "copy"; initial: CronEntry; isNew: true; section: string };
+
+type PromptState =
+  | { kind: "none" }
+  | { kind: "create-section"; parent: string }
+  | { kind: "rename-section"; path: string };
+
+type ConfirmState =
+  | { kind: "task"; name: string }
+  | { kind: "section"; path: string }
+  | null;
+
+type DragPayload =
+  | { kind: "task"; name: string }
+  | { kind: "section"; path: string };
 
 export function CronWidget({ api }: Props) {
   const { openContextMenu } = useContextMenu();
-  const { items, scripts, loading, error, reload, toggleEnabled } = useCron(api);
+  const {
+    items,
+    scripts,
+    sections,
+    loading,
+    error,
+    reload,
+    toggleEnabled,
+    createSection,
+    deleteSection,
+    renameSection,
+    moveTask,
+    moveSection,
+  } = useCron(api);
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState>({ kind: "none" });
+  const [prompt, setPrompt] = useState<PromptState>({ kind: "none" });
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ConfirmState>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  const dragPayloadRef = useRef<DragPayload | null>(null);
+  const dropCounterRef = useRef(0);
 
   useEffect(() => {
     if (!toast) return;
@@ -33,23 +83,43 @@ export function CronWidget({ api }: Props) {
     return () => clearTimeout(id);
   }, [toast]);
 
-  const tree = useMemo(() => buildCronTree(items), [items]);
+  const tree = useMemo(
+    () => buildCronTree(items, sections),
+    [items, sections],
+  );
 
   useEffect(() => {
     if (expanded.size === 0 && tree.length > 0) {
-      setExpanded(new Set(tree.map((g) => g.key)));
+      setExpanded(allSectionKeys(tree));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree.length]);
 
   const rows = useMemo(() => flattenTree(tree, expanded), [tree, expanded]);
 
-  const selected = useMemo(
-    () => items.find((t) => t.name === selectedName) ?? null,
-    [items, selectedName],
+  const selectedNode = useMemo(
+    () => rows.find((r) => r.node.key === selectedKey)?.node ?? null,
+    [rows, selectedKey],
   );
 
-  const toggleSection = (key: string) => {
+  const selectedTask =
+    selectedNode?.type === "task" ? selectedNode.task ?? null : null;
+  const selectedSectionPath =
+    selectedNode?.type === "section" ? selectedNode.path : null;
+
+  const expandPath = useCallback((path: string) => {
+    if (!path) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      const parts = path.split("/");
+      for (let i = 1; i <= parts.length; i++) {
+        next.add(`sec:${parts.slice(0, i).join("/")}`);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleExpand = (key: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -58,31 +128,36 @@ export function CronWidget({ api }: Props) {
     });
   };
 
-  const handleAdd = () => {
-    setDialog({ kind: "create", initial: null, isNew: true });
+  const handleSelect = (node: CronTreeNode) => {
+    setDialog({ kind: "none" });
+    setSelectedKey(node.key);
+  };
+
+  const handleAddTask = (sectionOverride?: string) => {
+    const section = sectionOverride ?? selectedSectionPath ?? "";
+    setDialog({ kind: "create", initial: null, isNew: true, section });
+    setSelectedKey(null);
   };
 
   const handleEdit = (target?: CronEntry) => {
-    const t = target ?? selected;
+    const t = target ?? selectedTask;
     if (!t) return;
     setDialog({ kind: "edit", initial: t, isNew: false });
   };
 
   const handleCopy = (target?: CronEntry) => {
-    const t = target ?? selected;
+    const t = target ?? selectedTask;
     if (!t) return;
     const copyName = makeCopyName(t.name, items.map((x) => x.name));
     setDialog({
       kind: "copy",
       initial: { ...t, name: copyName },
       isNew: true,
+      section: t.section,
     });
   };
 
-  const handleSubmit = async (
-    entry: CronEntry,
-    originalName: string | null,
-  ) => {
+  const handleSubmit = async (entry: CronEntry, originalName: string | null) => {
     setSaving(true);
     try {
       if (originalName) {
@@ -93,7 +168,8 @@ export function CronWidget({ api }: Props) {
         setToast(`Задача «${entry.name}» создана`);
       }
       setDialog({ kind: "none" });
-      setSelectedName(entry.name);
+      setSelectedKey(`task:${entry.name}`);
+      if (entry.section) expandPath(entry.section);
       await reload();
     } catch (e) {
       setToast((e as Error).message);
@@ -102,17 +178,29 @@ export function CronWidget({ api }: Props) {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteConfirm = async () => {
     if (!confirmDelete) return;
-    const name = confirmDelete;
-    setConfirmDelete(null);
+    setSaving(true);
     try {
-      await api.remove(name);
-      setToast(`Задача «${name}» удалена`);
-      if (selectedName === name) setSelectedName(null);
+      if (confirmDelete.kind === "task") {
+        await api.remove(confirmDelete.name);
+        setToast(`Задача «${confirmDelete.name}» удалена`);
+        if (selectedTask?.name === confirmDelete.name) setSelectedKey(null);
+      } else {
+        const err = await deleteSection(confirmDelete.path);
+        if (err) {
+          setToast(err);
+        } else {
+          setToast(`Секция «${confirmDelete.path}» удалена`);
+          if (selectedSectionPath === confirmDelete.path) setSelectedKey(null);
+        }
+      }
+      setConfirmDelete(null);
       await reload();
     } catch (e) {
       setToast((e as Error).message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -121,52 +209,253 @@ export function CronWidget({ api }: Props) {
     if (err) setToast(err);
   };
 
+  // -------- Prompt (section) --------
+
+  const openCreateSection = (parent: string) => {
+    setPrompt({ kind: "create-section", parent });
+  };
+
+  const openRenameSection = (path: string) => {
+    setPrompt({ kind: "rename-section", path });
+  };
+
+  const handlePromptSubmit = async (value: string) => {
+    if (prompt.kind === "create-section") {
+      const err = validateSectionName(value);
+      if (err) {
+        setToast(err);
+        return;
+      }
+      const newPath = prompt.parent ? `${prompt.parent}/${value}` : value;
+      const opErr = await createSection(newPath);
+      if (opErr) {
+        setToast(opErr);
+        return;
+      }
+      expandPath(prompt.parent);
+      setToast(`Секция «${newPath}» создана`);
+      setPrompt({ kind: "none" });
+      await reload();
+    } else if (prompt.kind === "rename-section") {
+      const err = validateSectionName(value);
+      if (err) {
+        setToast(err);
+        return;
+      }
+      const opErr = await renameSection(prompt.path, value);
+      if (opErr) {
+        setToast(opErr);
+        return;
+      }
+      setToast("Секция переименована");
+      setPrompt({ kind: "none" });
+      await reload();
+    }
+  };
+
+  // -------- DnD --------
+
+  const handleDragStart = (e: React.DragEvent, node: CronTreeNode) => {
+    if (node.type === "task" && node.task) {
+      dragPayloadRef.current = { kind: "task", name: node.task.name };
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", `task:${node.task.name}`);
+    } else if (node.type === "section") {
+      dragPayloadRef.current = { kind: "section", path: node.path };
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", `section:${node.path}`);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent, node: CronTreeNode) => {
+    const payload = dragPayloadRef.current;
+    if (!payload) return;
+    if (node.type !== "section") return;
+    if (
+      payload.kind === "section" &&
+      !canMoveSectionTo(payload.path, node.path)
+    ) {
+      return;
+    }
+    if (payload.kind === "task") {
+      const t = items.find((x) => x.name === payload.name);
+      if (t && getTaskSection(t) === node.path) return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTarget(node.key);
+  };
+
+  const handleDragEnter = () => {
+    dropCounterRef.current += 1;
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    dropCounterRef.current = Math.max(0, dropCounterRef.current - 1);
+    if (dropCounterRef.current === 0) setDropTarget(null);
+    const next = e.relatedTarget as Node | null;
+    if (next && (e.currentTarget as Node).contains(next)) {
+      dropCounterRef.current += 1;
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, node: CronTreeNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropTarget(null);
+    dropCounterRef.current = 0;
+    const payload = dragPayloadRef.current;
+    dragPayloadRef.current = null;
+    if (!payload || node.type !== "section") return;
+
+    if (payload.kind === "task") {
+      const err = await moveTask(payload.name, node.path);
+      if (err) setToast(err);
+      else {
+        expandPath(node.path);
+        setToast(
+          `Задача «${payload.name}» перемещена в «${node.path || "корень"}»`,
+        );
+      }
+    } else if (payload.kind === "section") {
+      if (!canMoveSectionTo(payload.path, node.path)) {
+        setToast("Нельзя переместить секцию внутрь себя");
+        return;
+      }
+      const err = await moveSection(payload.path, node.path);
+      if (err) setToast(err);
+      else {
+        expandPath(node.path);
+        setToast(
+          `Секция «${sectionName(payload.path)}» перемещена в «${node.path || "корень"}»`,
+        );
+      }
+    }
+    await reload();
+  };
+
+  const handleRootDragOver = (e: React.DragEvent) => {
+    if (!dragPayloadRef.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTarget("__root__");
+  };
+
+  const handleRootDragLeave = (e: React.DragEvent) => {
+    const next = e.relatedTarget as Node | null;
+    if (next && (e.currentTarget as Node).contains(next)) return;
+    if (dropTarget === "__root__") setDropTarget(null);
+  };
+
+  const handleRootDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDropTarget(null);
+    const payload = dragPayloadRef.current;
+    dragPayloadRef.current = null;
+    if (!payload) return;
+
+    if (payload.kind === "task") {
+      const err = await moveTask(payload.name, "");
+      if (err) setToast(err);
+      else setToast(`Задача «${payload.name}» перемещена в корень`);
+    } else if (payload.kind === "section") {
+      const err = await moveSection(payload.path, "");
+      if (err) setToast(err);
+      else setToast(`Секция «${sectionName(payload.path)}» перемещена в корень`);
+    }
+    await reload();
+  };
+
   // -------- Context menu --------
 
-  const openTaskMenu = (e: React.MouseEvent, task: CronEntry) => {
-    setSelectedName(task.name);
-    openContextMenu(e, [
-      act("Редактировать", () => handleEdit(task)),
-      act("Копировать", () => handleCopy(task)),
+  const sectionForNode = (node: CronTreeNode | null): string => {
+    if (!node) return "";
+    if (node.type === "section") return node.path;
+    if (node.type === "task" && node.task) return getTaskSection(node.task);
+    return "";
+  };
+
+  const buildMenu = (node: CronTreeNode | null) => {
+    const isSection = node?.type === "section";
+    const isTask = node?.type === "task";
+    const section = sectionForNode(node);
+    const path = isSection ? node.path : "";
+
+    return [
+      act("Добавить задачу", () => handleAddTask(section)),
+      act("Новая секция", () => openCreateSection(section)),
       sep(),
-      act("Удалить", () => setConfirmDelete(task.name), { danger: true }),
+      act("Редактировать", () => {
+        if (isTask && node.task) handleEdit(node.task);
+      }, { disabled: !isTask }),
+      act("Копировать", () => {
+        if (isTask && node.task) handleCopy(node.task);
+      }, { disabled: !isTask }),
+      act("Переименовать секцию", () => {
+        if (isSection) openRenameSection(path);
+      }, { disabled: !isSection }),
+      sep(),
+      act("Удалить", () => {
+        if (isTask && node.task) {
+          setConfirmDelete({ kind: "task", name: node.task.name });
+        } else if (isSection) {
+          setConfirmDelete({ kind: "section", path });
+        }
+      }, { danger: true, disabled: !isTask && !isSection }),
       sep(),
       act("Обновить", () => void reload(), { disabled: loading }),
-    ]);
+    ];
+  };
+
+  const openRowMenu = (e: React.MouseEvent, node: CronTreeNode) => {
+    setSelectedKey(node.key);
+    openContextMenu(e, buildMenu(node));
   };
 
   const openBlankMenu = (e: React.MouseEvent) => {
-    openContextMenu(e, [
-      act("Добавить задачу", handleAdd),
-      sep(),
-      act("Обновить", () => void reload(), { disabled: loading }),
-    ]);
+    openContextMenu(e, buildMenu(null));
   };
 
   return (
-    <div className="cron-tab" onContextMenu={openBlankMenu}>
+    <div className="cron-tab">
       <div className="cron-toolbar">
-        <button className="btn" onClick={handleAdd}>
+        <button className="btn" onClick={() => handleAddTask()}>
           Добавить
+        </button>
+        <button className="btn" onClick={() => openCreateSection("")}>
+          Новая секция
         </button>
         <button
           className="btn"
-          onClick={() => handleEdit()}
-          disabled={!selected}
+          onClick={() => selectedSectionPath && openRenameSection(selectedSectionPath)}
+          disabled={!selectedSectionPath}
+        >
+          Переименовать
+        </button>
+        <button
+          className="btn"
+          onClick={() => selectedTask && handleEdit(selectedTask)}
+          disabled={!selectedTask}
         >
           Редактировать
         </button>
         <button
           className="btn"
-          onClick={() => handleCopy()}
-          disabled={!selected}
+          onClick={() => selectedTask && handleCopy(selectedTask)}
+          disabled={!selectedTask}
         >
           Копировать
         </button>
         <button
           className="btn danger"
-          onClick={() => selected && setConfirmDelete(selected.name)}
-          disabled={!selected}
+          onClick={() => {
+            if (selectedTask) {
+              setConfirmDelete({ kind: "task", name: selectedTask.name });
+            } else if (selectedSectionPath) {
+              setConfirmDelete({ kind: "section", path: selectedSectionPath });
+            }
+          }}
+          disabled={!selectedTask && !selectedSectionPath}
         >
           Удалить
         </button>
@@ -180,7 +469,9 @@ export function CronWidget({ api }: Props) {
 
         <span className="cron-spacer" />
 
-        <span className="cron-stats">Всего: {items.length}</span>
+        <span className="cron-stats">
+          Задач: {items.length} · Секций: {sections.length}
+        </span>
       </div>
 
       <div className="cron-list">
@@ -193,7 +484,14 @@ export function CronWidget({ api }: Props) {
           <div className="col-section">Секция</div>
         </div>
 
-        <div className="cron-body" role="tree">
+        <div
+          className="cron-body"
+          role="tree"
+          onDragOver={handleRootDragOver}
+          onDragLeave={handleRootDragLeave}
+          onDrop={handleRootDrop}
+          onContextMenu={openBlankMenu}
+        >
           {loading && items.length === 0 && (
             <div className="cron-hint">Загрузка…</div>
           )}
@@ -205,39 +503,41 @@ export function CronWidget({ api }: Props) {
               </button>
             </div>
           )}
-          {!loading && !error && items.length === 0 && (
+          {!loading && !error && items.length === 0 && sections.length === 0 && (
             <div className="cron-hint">
-              Задачи не найдены. Нажмите «Добавить».
+              Задачи не найдены. Нажмите «Добавить» или «Новая секция».
             </div>
           )}
 
           {rows.map(({ node, depth }) => {
             const isSection = node.type === "section";
             const task = node.task;
-            const isSelected = task ? task.name === selectedName : false;
+            const isSelected = node.key === selectedKey;
             const isExpanded = expanded.has(node.key);
+            const isDrop = dropTarget === node.key;
 
             return (
               <div
                 key={node.key}
                 role="treeitem"
                 aria-selected={isSelected}
+                draggable={isSection || !!task}
                 className={
-                  "cron-row" + (isSelected ? " is-selected" : "")
+                  "cron-row" +
+                  (isSelected ? " is-selected" : "") +
+                  (isDrop ? " is-drop-target" : "")
                 }
-                onClick={() => {
-                  if (isSection) toggleSection(node.key);
-                  else if (task) setSelectedName(task.name);
-                }}
+                onClick={() => handleSelect(node)}
                 onDoubleClick={() => {
-                  if (task) {
-                    setSelectedName(task.name);
-                    setDialog({ kind: "edit", initial: task, isNew: false });
-                  }
+                  if (isSection) toggleExpand(node.key);
+                  else if (task) handleEdit(task);
                 }}
-                onContextMenu={
-                  task ? (e) => openTaskMenu(e, task) : undefined
-                }
+                onContextMenu={(e) => openRowMenu(e, node)}
+                onDragStart={(e) => handleDragStart(e, node)}
+                onDragEnter={handleDragEnter}
+                onDragOver={(e) => handleDragOver(e, node)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, node)}
               >
                 <div
                   className="cron-cell name"
@@ -248,7 +548,7 @@ export function CronWidget({ api }: Props) {
                       className="cron-chevron"
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleSection(node.key);
+                        toggleExpand(node.key);
                       }}
                       aria-label={isExpanded ? "Свернуть" : "Развернуть"}
                     >
@@ -283,30 +583,93 @@ export function CronWidget({ api }: Props) {
               </div>
             );
           })}
+
+          {dropTarget === "__root__" && rows.length > 0 && (
+            <div className="cron-drop-root">Переместить в корень</div>
+          )}
         </div>
       </div>
 
-      {dialog.kind !== "none" && (
+      {dialog.kind === "create" && (
         <CronDialog
-          initialValue={dialog.initial}
-          isNew={dialog.isNew}
+          initialValue={
+            dialog.section
+              ? { ...(dialog.initial ?? emptyTask()), section: dialog.section }
+              : dialog.initial
+          }
+          isNew={true}
           scripts={scripts}
+          sections={sections}
           onSubmit={handleSubmit}
           onCancel={() => setDialog({ kind: "none" })}
           saving={saving}
         />
       )}
 
+      {dialog.kind === "copy" && (
+        <CronDialog
+          initialValue={{ ...dialog.initial, section: dialog.section }}
+          isNew={true}
+          scripts={scripts}
+          sections={sections}
+          onSubmit={handleSubmit}
+          onCancel={() => setDialog({ kind: "none" })}
+          saving={saving}
+        />
+      )}
+
+      {dialog.kind === "edit" && (
+        <CronDialog
+          initialValue={dialog.initial}
+          isNew={false}
+          scripts={scripts}
+          sections={sections}
+          onSubmit={handleSubmit}
+          onCancel={() => setDialog({ kind: "none" })}
+          saving={saving}
+        />
+      )}
+
+      {prompt.kind !== "none" && (
+        <PromptDialog
+          title={
+            prompt.kind === "create-section"
+              ? "Новая секция"
+              : "Переименовать секцию"
+          }
+          label="Имя секции"
+          initialValue={
+            prompt.kind === "rename-section" ? sectionName(prompt.path) : ""
+          }
+          placeholder="например, maintenance"
+          validate={validateSectionName}
+          onSubmit={handlePromptSubmit}
+          onClose={() => setPrompt({ kind: "none" })}
+        />
+      )}
+
       {confirmDelete && (
         <div className="modal-backdrop" onClick={() => setConfirmDelete(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Удалить задачу?</h3>
-            <p>{confirmDelete}</p>
+            <h3>
+              {confirmDelete.kind === "task"
+                ? "Удалить задачу?"
+                : "Удалить секцию?"}
+            </h3>
+            <p>
+              {confirmDelete.kind === "task"
+                ? confirmDelete.name
+                : confirmDelete.path}
+            </p>
             <div className="modal-actions">
               <button className="btn" onClick={() => setConfirmDelete(null)}>
                 Отмена
               </button>
-              <button className="btn danger" onClick={handleDelete}>
+              <button
+                className="btn danger"
+                onClick={handleDeleteConfirm}
+                disabled={saving}
+              >
                 Удалить
               </button>
             </div>
@@ -325,4 +688,16 @@ function makeCopyName(base: string, existing: string[]): string {
   let i = 2;
   while (existing.includes(`${stem}${i}`)) i++;
   return `${stem}${i}`;
+}
+
+function emptyTask(): CronEntry {
+  return {
+    name: "",
+    schedule: "0 0 0 * * *",
+    script: "",
+    uid: "",
+    section: "",
+    enabled: true,
+    description: "",
+  };
 }

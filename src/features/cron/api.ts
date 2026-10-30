@@ -7,6 +7,10 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function sectionsKey(baseUrl: string): string {
+  return `cuttlefish.cron.sections.${baseUrl}`;
+}
+
 export function createCronApi(baseUrl: string) {
   const json = async <T>(path: string, init?: RequestInit): Promise<T> => {
     const res = await fetch(`${baseUrl}${path}`, {
@@ -49,6 +53,21 @@ export function createCronApi(baseUrl: string) {
     },
     listScripts(signal?: AbortSignal) {
       return json<CodeTreeNode[]>("/admin/code/all", { signal });
+    },
+    async listSections(): Promise<string[]> {
+      const raw = localStorage.getItem(sectionsKey(baseUrl));
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed)
+          ? parsed.filter((x) => typeof x === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    },
+    async saveSections(paths: string[]): Promise<void> {
+      localStorage.setItem(sectionsKey(baseUrl), JSON.stringify(paths));
     },
   };
 }

@@ -40,12 +40,12 @@
 .cron-row {
   display: grid;
   grid-template-columns:
-    minmax(140px, 1.4fr)
+    minmax(160px, 1.4fr)
     minmax(140px, 1.2fr)
     minmax(120px, 1fr)
     100px
     50px
-    minmax(100px, 0.8fr);
+    minmax(100px, 0.9fr);
   gap: 8px;
   padding: 6px 10px;
   align-items: center;
@@ -68,6 +68,7 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  position: relative;
 }
 
 .cron-row {
@@ -78,6 +79,14 @@
   font-size: 13px;
 }
 
+.cron-row[draggable="true"] {
+  cursor: grab;
+}
+
+.cron-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
 .cron-row:hover {
   background-color: var(--bg-hover-subtle);
 }
@@ -85,6 +94,13 @@
 .cron-row.is-selected {
   background-color: var(--accent);
   color: var(--fg-inverse);
+}
+
+.cron-row.is-drop-target {
+  background-color: var(--accent);
+  color: var(--fg-inverse);
+  outline: 1px dashed var(--fg-inverse);
+  outline-offset: -2px;
 }
 
 .cron-cell {
@@ -100,21 +116,9 @@
   gap: 4px;
 }
 
-.cron-cell.schedule {
-  color: var(--fg-muted);
-  font-size: 12px;
-}
-
-.cron-cell.script {
-  color: var(--fg-muted);
-  font-size: 12px;
-}
-
-.cron-cell.uid {
-  color: var(--fg-muted);
-  font-size: 12px;
-}
-
+.cron-cell.schedule,
+.cron-cell.script,
+.cron-cell.uid,
 .cron-cell.section {
   color: var(--fg-muted);
   font-size: 12px;
@@ -158,6 +162,8 @@
 
 .cron-icon {
   flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .cron-label {
@@ -180,6 +186,18 @@
   color: var(--fg-muted);
   font-style: italic;
   font-size: 13px;
+}
+
+.cron-drop-root {
+  padding: 8px;
+  margin: 4px 8px;
+  text-align: center;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 12px;
+  font-style: italic;
+  pointer-events: none;
 }
 
 /* ---------- Диалог Cron ---------- */

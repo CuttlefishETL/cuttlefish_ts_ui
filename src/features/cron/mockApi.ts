@@ -18,7 +18,7 @@ const INITIAL: CronEntry[] = [
     schedule: "0 0 * * * *",
     script: "cleanup.lua",
     uid: "system",
-    section: "maintenance",
+    section: "maintenance/cleanup",
     enabled: true,
     description: "Очистка временных файлов раз в час",
   },
@@ -81,41 +81,88 @@ const SCRIPT_TREE: CodeTreeNode[] = [
   { name: "transform_in.lua", path: "transform_in.lua", type: "file" },
 ];
 
+interface MockState {
+  items: CronEntry[];
+  sections: Set<string>;
+}
+
 export function createMockCronApi(): CronApi {
-  const items: CronEntry[] = INITIAL.map((e) => ({ ...e }));
+  const state: MockState = {
+    items: INITIAL.map((e) => ({ ...e })),
+    sections: new Set([
+      "stats",
+      "maintenance",
+      "maintenance/cleanup",
+      "ingest",
+      "empty",
+    ]),
+  };
 
   return {
     async list() {
       await delay(180);
-      return items.map((e) => ({ ...e }));
+      return state.items.map((e) => ({ ...e }));
     },
+
     async create(input) {
       await delay(250);
-      if (items.some((e) => e.name === input.name)) {
+      if (state.items.some((e) => e.name === input.name)) {
         throw new Error("Задача с таким именем уже существует");
       }
-      items.push({ ...input });
+      state.items.push({ ...input });
+      if (input.section) {
+        const parts = input.section.split("/").filter(Boolean);
+        for (let i = 1; i <= parts.length; i++) {
+          state.sections.add(parts.slice(0, i).join("/"));
+        }
+      }
       return { ...input };
     },
+
     async update(oldName, input) {
       await delay(250);
-      const idx = items.findIndex((e) => e.name === oldName);
+      const idx = state.items.findIndex((e) => e.name === oldName);
       if (idx < 0) throw new Error("Задача не найдена");
-      if (oldName !== input.name && items.some((e) => e.name === input.name)) {
+      if (
+        oldName !== input.name &&
+        state.items.some((e) => e.name === input.name)
+      ) {
         throw new Error("Задача с таким именем уже существует");
       }
-      items[idx] = { ...input };
+      state.items[idx] = { ...input };
+      if (input.section) {
+        const parts = input.section.split("/").filter(Boolean);
+        for (let i = 1; i <= parts.length; i++) {
+          state.sections.add(parts.slice(0, i).join("/"));
+        }
+      }
       return { ...input };
     },
+
     async remove(name) {
       await delay(200);
-      const idx = items.findIndex((e) => e.name === name);
+      const idx = state.items.findIndex((e) => e.name === name);
       if (idx < 0) throw new Error("Задача не найдена");
-      items.splice(idx, 1);
+      state.items.splice(idx, 1);
     },
+
     async listScripts() {
       await delay(150);
       return SCRIPT_TREE;
+    },
+
+    async listSections() {
+      await delay(100);
+      return Array.from(state.sections).sort();
+    },
+
+    async saveSections(paths) {
+      await delay(100);
+      state.sections.clear();
+      for (const p of paths) {
+        const trimmed = p.trim().replace(/\/+$/, "");
+        if (trimmed) state.sections.add(trimmed);
+      }
     },
   };
 }

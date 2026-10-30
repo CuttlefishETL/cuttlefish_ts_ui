@@ -23,7 +23,7 @@ import {
   parentPath,
   validateFolderName,
 } from "./types";
-import { PromptDialog } from "./PromptDialog";
+import { PromptDialog } from "../../components/PromptDialog";
 import { act, sep, useContextMenu } from "../../components/context-menu";
 import "./connectors.css";
 

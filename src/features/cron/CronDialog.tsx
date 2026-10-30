@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { CodeTreeNode, CronEntry } from "./types";
 import { isValidSchedule } from "./types";
 import { ScriptPickerDialog } from "./ScriptPickerDialog";
 
 interface Props {
   initialValue: CronEntry | null;
-  /** Режим «создание» — даже если initialValue задан (для Copy). */
   isNew: boolean;
   scripts: CodeTreeNode[];
+  sections: string[];
   onSubmit: (entry: CronEntry, originalName: string | null) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
@@ -17,17 +17,24 @@ export function CronDialog({
   initialValue,
   isNew,
   scripts,
+  sections,
   onSubmit,
   onCancel,
   saving,
 }: Props) {
+  const sectionsListId = useId();
+
   const [name, setName] = useState(initialValue?.name ?? "");
-  const [schedule, setSchedule] = useState(initialValue?.schedule ?? "0 0 0 * * *");
+  const [schedule, setSchedule] = useState(
+    initialValue?.schedule ?? "0 0 0 * * *",
+  );
   const [script, setScript] = useState(initialValue?.script ?? "");
   const [uid, setUid] = useState(initialValue?.uid ?? "");
   const [section, setSection] = useState(initialValue?.section ?? "");
   const [enabled, setEnabled] = useState(initialValue?.enabled ?? true);
-  const [description, setDescription] = useState(initialValue?.description ?? "");
+  const [description, setDescription] = useState(
+    initialValue?.description ?? "",
+  );
   const [localError, setLocalError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -36,7 +43,8 @@ export function CronDialog({
     setLocalError(null);
 
     if (!name.trim()) return setLocalError("Имя обязательно");
-    if (name.length > 128) return setLocalError("Имя не должно превышать 128 символов");
+    if (name.length > 128)
+      return setLocalError("Имя не должно превышать 128 символов");
     if (!schedule.trim()) return setLocalError("Расписание обязательно");
     if (!isValidSchedule(schedule))
       return setLocalError("Расписание должно содержать 6 полей");
@@ -65,10 +73,7 @@ export function CronDialog({
   return (
     <>
       <div className="modal-backdrop" onClick={saving ? undefined : onCancel}>
-        <div
-          className="modal cron-dialog"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="modal cron-dialog" onClick={(e) => e.stopPropagation()}>
           <h3>{isNew ? "Новая задача" : `Задача «${initialValue?.name}»`}</h3>
 
           <form onSubmit={handleSubmit}>
@@ -148,8 +153,17 @@ export function CronDialog({
                 onChange={(e) => setSection(e.target.value)}
                 disabled={saving}
                 maxLength={128}
+                list={sectionsListId}
                 placeholder="stats, maintenance, …"
               />
+              <datalist id={sectionsListId}>
+                {sections.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+              <span className="field-hint">
+                Выберите из списка или введите новую секцию
+              </span>
             </div>
 
             <div className="checkbox-field">
