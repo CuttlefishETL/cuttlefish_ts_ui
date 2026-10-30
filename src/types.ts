@@ -1,6 +1,6 @@
 export type NodeId = string;
 
-export type TabId = "settings" | "connectors" | "plugins" | "metrics" | "scripts" | "cron";
+export type TabId = "settings" | "connectors" | "plugins" | "metrics" | "scripts" | "cron"  | "security";
 
 export type NodeKind = "folder" | "server";
 

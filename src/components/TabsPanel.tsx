@@ -5,6 +5,7 @@ import { PluginsTab } from "./tabs/PluginsTab";
 import { MetricsTab } from "./tabs/MetricsTab";
 import { ScriptsTab } from "./tabs/ScriptsTab";
 import { CronTab } from "./tabs/CronTab";
+import { SecurityTab } from "./tabs/SecurityTab";
 
 interface TabsPanelProps {
   servers: Server[];
@@ -68,7 +69,9 @@ export function TabsPanel({
       case "scripts":
         return <ScriptsTab />;
       case "cron":
-        return <CronTab server={server} />;        
+        return <CronTab server={server} />; 
+      case "security":
+        return <SecurityTab server={server} />;               
     }
   };
 
