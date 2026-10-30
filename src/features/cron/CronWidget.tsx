@@ -4,6 +4,7 @@ import { useCron } from "./useCron";
 import { buildCronTree, flattenTree } from "./buildTree";
 import { CronDialog } from "./CronDialog";
 import type { CronEntry } from "./types";
+import { act, sep, useContextMenu } from "../../components/context-menu";
 import "./cron.css";
 
 interface Props {
@@ -17,6 +18,7 @@ type DialogState =
   | { kind: "copy"; initial: CronEntry; isNew: true };
 
 export function CronWidget({ api }: Props) {
+  const { openContextMenu } = useContextMenu();
   const { items, scripts, loading, error, reload, toggleEnabled } = useCron(api);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -60,22 +62,27 @@ export function CronWidget({ api }: Props) {
     setDialog({ kind: "create", initial: null, isNew: true });
   };
 
-  const handleEdit = () => {
-    if (!selected) return;
-    setDialog({ kind: "edit", initial: selected, isNew: false });
+  const handleEdit = (target?: CronEntry) => {
+    const t = target ?? selected;
+    if (!t) return;
+    setDialog({ kind: "edit", initial: t, isNew: false });
   };
 
-  const handleCopy = () => {
-    if (!selected) return;
-    const copyName = makeCopyName(selected.name, items.map((t) => t.name));
+  const handleCopy = (target?: CronEntry) => {
+    const t = target ?? selected;
+    if (!t) return;
+    const copyName = makeCopyName(t.name, items.map((x) => x.name));
     setDialog({
       kind: "copy",
-      initial: { ...selected, name: copyName },
+      initial: { ...t, name: copyName },
       isNew: true,
     });
   };
 
-  const handleSubmit = async (entry: CronEntry, originalName: string | null) => {
+  const handleSubmit = async (
+    entry: CronEntry,
+    originalName: string | null,
+  ) => {
     setSaving(true);
     try {
       if (originalName) {
@@ -114,16 +121,46 @@ export function CronWidget({ api }: Props) {
     if (err) setToast(err);
   };
 
+  // -------- Context menu --------
+
+  const openTaskMenu = (e: React.MouseEvent, task: CronEntry) => {
+    setSelectedName(task.name);
+    openContextMenu(e, [
+      act("Редактировать", () => handleEdit(task)),
+      act("Копировать", () => handleCopy(task)),
+      sep(),
+      act("Удалить", () => setConfirmDelete(task.name), { danger: true }),
+      sep(),
+      act("Обновить", () => void reload(), { disabled: loading }),
+    ]);
+  };
+
+  const openBlankMenu = (e: React.MouseEvent) => {
+    openContextMenu(e, [
+      act("Добавить задачу", handleAdd),
+      sep(),
+      act("Обновить", () => void reload(), { disabled: loading }),
+    ]);
+  };
+
   return (
-    <div className="cron-tab">
+    <div className="cron-tab" onContextMenu={openBlankMenu}>
       <div className="cron-toolbar">
         <button className="btn" onClick={handleAdd}>
           Добавить
         </button>
-        <button className="btn" onClick={handleEdit} disabled={!selected}>
+        <button
+          className="btn"
+          onClick={() => handleEdit()}
+          disabled={!selected}
+        >
           Редактировать
         </button>
-        <button className="btn" onClick={handleCopy} disabled={!selected}>
+        <button
+          className="btn"
+          onClick={() => handleCopy()}
+          disabled={!selected}
+        >
           Копировать
         </button>
         <button
@@ -133,7 +170,11 @@ export function CronWidget({ api }: Props) {
         >
           Удалить
         </button>
-        <button className="btn" onClick={() => void reload()} disabled={loading}>
+        <button
+          className="btn"
+          onClick={() => void reload()}
+          disabled={loading}
+        >
           Обновить
         </button>
 
@@ -194,6 +235,9 @@ export function CronWidget({ api }: Props) {
                     setDialog({ kind: "edit", initial: task, isNew: false });
                   }
                 }}
+                onContextMenu={
+                  task ? (e) => openTaskMenu(e, task) : undefined
+                }
               >
                 <div
                   className="cron-cell name"
@@ -222,9 +266,7 @@ export function CronWidget({ api }: Props) {
                 <div className="cron-cell schedule mono">
                   {task?.schedule ?? ""}
                 </div>
-                <div className="cron-cell script">
-                  {task?.script ?? ""}
-                </div>
+                <div className="cron-cell script">{task?.script ?? ""}</div>
                 <div className="cron-cell uid">{task?.uid ?? ""}</div>
                 <div className="cron-cell enabled">
                   {task && (

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SecurityApi } from "./api";
 import type { ActiveSession } from "./types";
 import { formatRelative, shortSessionId, sourceIcon } from "./types";
+import { act, sep, useContextMenu } from "../../components/context-menu";
 
 interface Props {
   api: SecurityApi;
@@ -15,15 +16,29 @@ interface Props {
   currentSessionId: string | null;
 }
 
-export function ActiveUsersTab({ api, state, readonly, currentSessionId }: Props) {
+export function ActiveUsersTab({
+  api,
+  state,
+  readonly,
+  currentSessionId,
+}: Props) {
+  const { openContextMenu } = useContextMenu();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [confirmTerminate, setConfirmTerminate] = useState<ActiveSession | null>(null);
+  const [confirmTerminate, setConfirmTerminate] =
+    useState<ActiveSession | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
 
   const selected = state.data.find((s) => s.session_id === selectedId) ?? null;
 
-  const canTerminate = !!selected && !selected.is_current && !readonly;
+  const canTerminate = (s: ActiveSession | null): boolean =>
+    !!s && !s.is_current && !readonly && s.session_id !== currentSessionId;
 
   const handleTerminate = async () => {
     if (!confirmTerminate) return;
@@ -42,19 +57,19 @@ export function ActiveUsersTab({ api, state, readonly, currentSessionId }: Props
     }
   };
 
-  const handleTerminateAll = async () => {
-    if (!selected) return;
+  const handleTerminateAll = async (user: ActiveSession) => {
+    if (readonly) return;
     if (
       !window.confirm(
-        `Завершить все сессии пользователя «${selected.user_name}»?`,
+        `Завершить все сессии пользователя «${user.user_name}»?`,
       )
     ) {
       return;
     }
     setBusy(true);
     try {
-      await api.deleteUserSessions(selected.user_id);
-      setToast(`Все сессии «${selected.user_name}» завершены`);
+      await api.deleteUserSessions(user.user_id);
+      setToast(`Все сессии «${user.user_name}» завершены`);
       setSelectedId(null);
       await state.reload();
     } catch (e) {
@@ -64,24 +79,58 @@ export function ActiveUsersTab({ api, state, readonly, currentSessionId }: Props
     }
   };
 
+  const openRowMenu = (e: React.MouseEvent, session: ActiveSession) => {
+    setSelectedId(session.session_id);
+    openContextMenu(e, [
+      act("Завершить сессию", () => setConfirmTerminate(session), {
+        danger: true,
+        disabled: !canTerminate(session) || busy,
+      }),
+      act(
+        "Завершить все сессии пользователя",
+        () => void handleTerminateAll(session),
+        { disabled: readonly || busy },
+      ),
+      sep(),
+      act("Обновить", () => void state.reload(), {
+        disabled: state.loading || busy,
+      }),
+    ]);
+  };
+
   return (
-    <div className="sec-panel">
+    <div className="sec-panel" onContextMenu={(e) => {
+      openContextMenu(e, [
+        sep(),
+        act("Обновить", () => void state.reload(), {
+          disabled: state.loading || busy,
+        }),
+      ]);
+    }}>
       <div className="sec-toolbar">
-        <button className="btn" onClick={() => state.reload()} disabled={state.loading || busy}>
+        <button
+          className="btn"
+          onClick={() => state.reload()}
+          disabled={state.loading || busy}
+        >
           Обновить
         </button>
         <button
           className="btn"
           onClick={() => selected && setConfirmTerminate(selected)}
-          disabled={!canTerminate || busy}
-          title={selected?.is_current ? "Нельзя завершить текущую сессию" : undefined}
+          disabled={!canTerminate(selected) || busy}
+          title={
+            selected?.is_current
+              ? "Нельзя завершить текущую сессию"
+              : undefined
+          }
         >
           Завершить сессию
         </button>
         <button
           className="btn"
-          onClick={handleTerminateAll}
-          disabled={!selected || busy}
+          onClick={() => selected && void handleTerminateAll(selected)}
+          disabled={!selected || readonly || busy}
         >
           Завершить все сессии пользователя
         </button>
@@ -120,12 +169,16 @@ export function ActiveUsersTab({ api, state, readonly, currentSessionId }: Props
 
           {state.data.map((s) => {
             const isSelected = s.session_id === selectedId;
-            const isCurrent = s.session_id === currentSessionId || s.is_current;
+            const isCurrent =
+              s.session_id === currentSessionId || s.is_current;
             return (
               <div
                 key={s.session_id}
-                className={"sec-row sessions" + (isSelected ? " is-selected" : "")}
+                className={
+                  "sec-row sessions" + (isSelected ? " is-selected" : "")
+                }
                 onClick={() => setSelectedId(s.session_id)}
+                onContextMenu={(e) => openRowMenu(e, s)}
               >
                 <div className="cell mono" title={s.session_id}>
                   {shortSessionId(s.session_id)}
@@ -141,7 +194,10 @@ export function ActiveUsersTab({ api, state, readonly, currentSessionId }: Props
                 </div>
                 <div className="cell center">
                   {s.debug ? (
-                    <span className="debug-badge" title="Debug-сессия не чистится автоматически">
+                    <span
+                      className="debug-badge"
+                      title="Debug-сессия не чистится автоматически"
+                    >
                       🔵
                     </span>
                   ) : (
@@ -156,18 +212,32 @@ export function ActiveUsersTab({ api, state, readonly, currentSessionId }: Props
       </div>
 
       {confirmTerminate && (
-        <div className="modal-backdrop" onClick={() => setConfirmTerminate(null)}>
+        <div
+          className="modal-backdrop"
+          onClick={() => setConfirmTerminate(null)}
+        >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Завершить сессию?</h3>
             <p>
-              Сессия <span className="mono">{shortSessionId(confirmTerminate.session_id)}</span>{" "}
-              пользователя <b>{confirmTerminate.user_name}</b> будет немедленно завершена.
+              Сессия{" "}
+              <span className="mono">
+                {shortSessionId(confirmTerminate.session_id)}
+              </span>{" "}
+              пользователя <b>{confirmTerminate.user_name}</b> будет немедленно
+              завершена.
             </p>
             <div className="modal-actions">
-              <button className="btn" onClick={() => setConfirmTerminate(null)}>
+              <button
+                className="btn"
+                onClick={() => setConfirmTerminate(null)}
+              >
                 Отмена
               </button>
-              <button className="btn danger" onClick={handleTerminate} disabled={busy}>
+              <button
+                className="btn danger"
+                onClick={handleTerminate}
+                disabled={busy}
+              >
                 Завершить
               </button>
             </div>

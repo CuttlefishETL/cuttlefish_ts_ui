@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { SecurityApi } from "./api";
 import type { RoleRecord, UserRecord } from "./types";
 import { groupUsersByRole } from "./types";
+import { act, sep, useContextMenu } from "../../components/context-menu";
 
 interface Props {
   api: SecurityApi;
@@ -22,6 +23,7 @@ type Editor =
   | { kind: "edit"; user: UserRecord };
 
 export function UsersTab({ api, state, roles, readonly }: Props) {
+  const { openContextMenu } = useContextMenu();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editor, setEditor] = useState<Editor>({ kind: "none" });
   const [busy, setBusy] = useState(false);
@@ -43,7 +45,8 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
   const toggleGroup = (key: string) => {
     setExpanded((prev) => {
       const n = new Set(prev);
-      n.has(key) ? n.delete(key) : n.add(key);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
       return n;
     });
   };
@@ -118,15 +121,58 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
     return true;
   };
 
+  const openRowMenu = (e: React.MouseEvent, user: UserRecord) => {
+    setSelectedId(user.id);
+    openContextMenu(e, [
+      act("Редактировать", () => setEditor({ kind: "edit", user }), {
+        disabled: !canEdit(user) || busy,
+      }),
+      act("Сбросить пароль", () => {
+        const pwd = window.prompt(`Новый пароль для «${user.username}»:`);
+        if (pwd) {
+          void api
+            .changePassword(user.id, pwd)
+            .then(() => setToast("Пароль обновлён"))
+            .catch((err) => setToast((err as Error).message));
+        }
+      }, { disabled: readonly || busy }),
+      sep(),
+      act("Удалить", () => setConfirmDelete(user), {
+        danger: true,
+        disabled: !canDelete(user) || busy,
+      }),
+      sep(),
+      act("Обновить", () => void state.reload(), {
+        disabled: state.loading || busy,
+      }),
+    ]);
+  };
+
+  const openBlankMenu = (e: React.MouseEvent) => {
+    openContextMenu(e, [
+      act("Создать пользователя", handleCreate, { disabled: readonly || busy }),
+      sep(),
+      act("Обновить", () => void state.reload(), {
+        disabled: state.loading || busy,
+      }),
+    ]);
+  };
+
   return (
-    <div className="sec-panel">
+    <div className="sec-panel" onContextMenu={openBlankMenu}>
       <div className="sec-toolbar">
-        <button className="btn" onClick={handleCreate} disabled={readonly || busy}>
+        <button
+          className="btn"
+          onClick={handleCreate}
+          disabled={readonly || busy}
+        >
           Создать
         </button>
         <button
           className="btn danger"
-          onClick={() => selected && canDelete(selected) && setConfirmDelete(selected)}
+          onClick={() =>
+            selected && canDelete(selected) && setConfirmDelete(selected)
+          }
           disabled={!selected || !canDelete(selected) || busy}
           title={
             selected?.username === "admin"
@@ -136,7 +182,11 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
         >
           Удалить
         </button>
-        <button className="btn" onClick={() => state.reload()} disabled={state.loading || busy}>
+        <button
+          className="btn"
+          onClick={() => state.reload()}
+          disabled={state.loading || busy}
+        >
           Обновить
         </button>
         <span className="spacer" />
@@ -170,6 +220,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
             onToggle={() => toggleGroup("admin")}
             selectedId={selectedId}
             onSelect={handleSelect}
+            onContextMenu={openRowMenu}
           />
           <UserGroup
             label="Пользователи API"
@@ -179,6 +230,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
             onToggle={() => toggleGroup("user")}
             selectedId={selectedId}
             onSelect={handleSelect}
+            onContextMenu={openRowMenu}
           />
           <UserGroup
             label="Наблюдатели"
@@ -188,6 +240,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
             onToggle={() => toggleGroup("viewer")}
             selectedId={selectedId}
             onSelect={handleSelect}
+            onContextMenu={openRowMenu}
           />
           {grouped.other.length > 0 && (
             <UserGroup
@@ -198,6 +251,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
               onToggle={() => toggleGroup("other")}
               selectedId={selectedId}
               onSelect={handleSelect}
+              onContextMenu={openRowMenu}
             />
           )}
         </div>
@@ -238,7 +292,11 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
               <button className="btn" onClick={() => setConfirmDelete(null)}>
                 Отмена
               </button>
-              <button className="btn danger" onClick={handleDelete} disabled={busy}>
+              <button
+                className="btn danger"
+                onClick={handleDelete}
+                disabled={busy}
+              >
                 Удалить
               </button>
             </div>
@@ -259,9 +317,18 @@ interface GroupProps {
   onToggle: () => void;
   selectedId: number | null;
   onSelect: (u: UserRecord) => void;
+  onContextMenu: (e: React.MouseEvent, u: UserRecord) => void;
 }
 
-function UserGroup({ label, users, expanded, onToggle, selectedId, onSelect }: GroupProps) {
+function UserGroup({
+  label,
+  users,
+  expanded,
+  onToggle,
+  selectedId,
+  onSelect,
+  onContextMenu,
+}: GroupProps) {
   return (
     <div className="sec-group">
       <div className="sec-group-header" onClick={onToggle}>
@@ -274,8 +341,11 @@ function UserGroup({ label, users, expanded, onToggle, selectedId, onSelect }: G
         users.map((u) => (
           <div
             key={u.id}
-            className={"sec-leaf" + (u.id === selectedId ? " is-selected" : "")}
+            className={
+              "sec-leaf" + (u.id === selectedId ? " is-selected" : "")
+            }
             onClick={() => onSelect(u)}
+            onContextMenu={(e) => onContextMenu(e, u)}
           >
             <span className="icon">👤</span>
             <span className="label">{u.username}</span>
@@ -303,7 +373,8 @@ function UserView({ user, canEdit, onEdit, readonly }: UserViewProps) {
         <PropRow label="Роль">{user.role}</PropRow>
         {user.username === "admin" && (
           <div className="props-banner">
-            Встроенный администратор. Роль нельзя изменить, пользователя нельзя удалить.
+            Встроенный администратор. Роль нельзя изменить, пользователя нельзя
+            удалить.
           </div>
         )}
       </div>
@@ -318,7 +389,13 @@ function UserView({ user, canEdit, onEdit, readonly }: UserViewProps) {
   );
 }
 
-function PropRow({ label, children }: { label: string; children: React.ReactNode }) {
+function PropRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="prop-row">
       <div className="prop-label">{label}</div>
@@ -332,11 +409,22 @@ interface UserFormProps {
   roles: RoleRecord[];
   readonly: boolean;
   busy: boolean;
-  onSave: (data: { username: string; role: string; password?: string }) => Promise<void>;
+  onSave: (data: {
+    username: string;
+    role: string;
+    password?: string;
+  }) => Promise<void>;
   onCancel: () => void;
 }
 
-function UserForm({ initial, roles, readonly, busy, onSave, onCancel }: UserFormProps) {
+function UserForm({
+  initial,
+  roles,
+  readonly,
+  busy,
+  onSave,
+  onCancel,
+}: UserFormProps) {
   const [username, setUsername] = useState(initial?.username ?? "");
   const [role, setRole] = useState(initial?.role ?? "user");
   const [password, setPassword] = useState("");

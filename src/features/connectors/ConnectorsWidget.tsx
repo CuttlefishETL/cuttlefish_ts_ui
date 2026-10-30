@@ -416,6 +416,7 @@ export function ConnectorsWidget({ api }: Props) {
     const isFolder = node?.type === "folder";
     const isConnector = node?.type === "connector";
     const folder = folderForNode(node);
+    const nodePath = node?.type === "folder" ? node.path : "";
 
     return [
       act("Создать коннектор", () => handleCreateConnector(folder), {
@@ -423,7 +424,7 @@ export function ConnectorsWidget({ api }: Props) {
       }),
       act("Новая папка", () => openCreateFolder(folder), { disabled: busy }),
       sep(),
-      act("Переименовать", () => openRenameFolder((node as any).path), {
+      act("Переименовать", () => openRenameFolder(nodePath), {
         disabled: !isFolder || busy,
       }),
       act(
@@ -432,7 +433,7 @@ export function ConnectorsWidget({ api }: Props) {
           if (isConnector && node?.connector) {
             setConfirmDelete({ kind: "connector", name: node.connector.name });
           } else if (isFolder) {
-            setConfirmDelete({ kind: "folder", path: (node as any).path });
+            setConfirmDelete({ kind: "folder", path: nodePath });
           }
         },
         { danger: true, disabled: (!isFolder && !isConnector) || busy },
@@ -463,7 +464,11 @@ export function ConnectorsWidget({ api }: Props) {
   return (
     <div className="connectors-tab">
       <div className="connectors-toolbar">
-        <button className="btn" onClick={() => handleCreateConnector()} disabled={busy}>
+        <button
+          className="btn"
+          onClick={() => handleCreateConnector()}
+          disabled={busy}
+        >
           Создать
         </button>
         <button className="btn" onClick={() => openCreateFolder("")} disabled={busy}>
@@ -471,7 +476,9 @@ export function ConnectorsWidget({ api }: Props) {
         </button>
         <button
           className="btn"
-          onClick={() => selectedFolderPath !== null && openRenameFolder(selectedFolderPath)}
+          onClick={() =>
+            selectedFolderPath !== null && openRenameFolder(selectedFolderPath)
+          }
           disabled={selectedFolderPath === null || busy}
         >
           Переименовать
@@ -480,7 +487,10 @@ export function ConnectorsWidget({ api }: Props) {
           className="btn danger"
           onClick={() => {
             if (selectedConnector) {
-              setConfirmDelete({ kind: "connector", name: selectedConnector.name });
+              setConfirmDelete({
+                kind: "connector",
+                name: selectedConnector.name,
+              });
             } else if (selectedFolderPath !== null) {
               setConfirmDelete({ kind: "folder", path: selectedFolderPath });
             }

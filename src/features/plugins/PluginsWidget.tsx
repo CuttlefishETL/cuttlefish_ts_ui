@@ -7,18 +7,19 @@ import {
 } from "./buildTree";
 import type { PluginListItem } from "./types";
 import { pluginTypeFromFilename } from "./types";
+import { usePlugins } from "./usePlugins";
 import { PluginCardDialog } from "./PluginCardDialog";
 import { UploadPluginDialog } from "./UploadPluginDialog";
+import { act, sep, useContextMenu } from "../../components/context-menu";
 import "./plugins.css";
 
-import type { PluginsApi } from "./api";
-import { usePlugins } from "./usePlugins";
-
 interface Props {
-  api: PluginsApi;
+  api: import("./api").PluginsApi;
 }
 
 export function PluginsWidget({ api }: Props) {
+  const { openContextMenu } = useContextMenu();
+
   const {
     plugins,
     status,
@@ -49,7 +50,10 @@ export function PluginsWidget({ api }: Props) {
   }, [toast]);
 
   const tree = useMemo(() => buildPluginTree(plugins), [plugins]);
-  const filteredTree = useMemo(() => filterTree(tree, search), [tree, search]);
+  const filteredTree = useMemo(
+    () => filterTree(tree, search),
+    [tree, search],
+  );
 
   const effectiveExpanded = useMemo(
     () => (search.trim() ? allFolderKeys(filteredTree) : userExpanded),
@@ -80,25 +84,22 @@ export function PluginsWidget({ api }: Props) {
     if (err) setToast(err);
   };
 
-  const handleLoad = async () => {
-    if (!selectedPlugin) return;
-    const err = await load(selectedPlugin.id);
+  const handleLoad = async (p: PluginListItem) => {
+    const err = await load(p.id);
     if (err) setToast(err);
   };
 
-  const handleUnload = async () => {
-    if (!selectedPlugin) return;
-    const err = await unload(selectedPlugin.id);
+  const handleUnload = async (p: PluginListItem) => {
+    const err = await unload(p.id);
     if (err) setToast(err);
   };
 
-  const handleDownload = async () => {
-    if (!selectedPlugin) return;
+  const handleDownload = async (p: PluginListItem) => {
     try {
-      const blob = await api.download(selectedPlugin.id);
+      const blob = await api.download(p.id);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = selectedPlugin.filename.split("/").pop() ?? selectedPlugin.name;
+      a.download = p.filename.split("/").pop() ?? p.name;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
@@ -114,7 +115,10 @@ export function PluginsWidget({ api }: Props) {
     if (err) setToast(err);
   };
 
-  const handleUpload = async (file: File, onProgress: (p: number) => void) => {
+  const handleUpload = async (
+    file: File,
+    onProgress: (p: number) => void,
+  ) => {
     await api.upload(file, onProgress);
     setUploadOpen(false);
     await reload();
@@ -156,13 +160,54 @@ export function PluginsWidget({ api }: Props) {
       selectedPlugin.state === "Failed");
   const canUnload = !!selectedPlugin && selectedPlugin.state === "Active";
 
+  // -------- Context menu --------
+
+  const openPluginMenu = (
+    e: React.MouseEvent,
+    plugin: PluginListItem,
+  ) => {
+    setSelected(`plugin:${plugin.id}`);
+    openContextMenu(e, [
+      act("Загрузить", () => void handleLoad(plugin), {
+        disabled:
+          plugin.state === "Active" || busyIds.has(plugin.id),
+      }),
+      act("Выгрузить", () => void handleUnload(plugin), {
+        disabled:
+          plugin.state !== "Active" || busyIds.has(plugin.id),
+      }),
+      sep(),
+      act("Скачать", () => void handleDownload(plugin), {
+        disabled: busyIds.has(plugin.id),
+      }),
+      act("Удалить", () => setConfirmDel(plugin), {
+        danger: true,
+        disabled: busyIds.has(plugin.id),
+      }),
+      sep(),
+      act("Открыть карточку", () => setCardId(plugin.id)),
+    ]);
+  };
+
+  const openBlankMenu = (e: React.MouseEvent) => {
+    openContextMenu(e, [
+      act("Добавить плагин", () => setUploadOpen(true)),
+      sep(),
+      act("Обновить", () => void reload(), { disabled: loading }),
+    ]);
+  };
+
   return (
-    <div className="plugins-tab">
+    <div className="plugins-tab" onContextMenu={openBlankMenu}>
       <div className="plugins-toolbar">
         <button className="btn" onClick={() => setUploadOpen(true)}>
           Добавить
         </button>
-        <button className="btn" onClick={handleDownload} disabled={!canDownload}>
+        <button
+          className="btn"
+          onClick={() => selectedPlugin && void handleDownload(selectedPlugin)}
+          disabled={!canDownload}
+        >
           Скачать
         </button>
         <button
@@ -172,16 +217,28 @@ export function PluginsWidget({ api }: Props) {
         >
           Удалить
         </button>
-        <button className="btn" onClick={() => void reload()} disabled={loading}>
+        <button
+          className="btn"
+          onClick={() => void reload()}
+          disabled={loading}
+        >
           Обновить
         </button>
 
         <span className="plugins-toolbar-sep" />
 
-        <button className="btn" onClick={handleLoad} disabled={!canLoad}>
+        <button
+          className="btn"
+          onClick={() => selectedPlugin && void handleLoad(selectedPlugin)}
+          disabled={!canLoad}
+        >
           Загрузить
         </button>
-        <button className="btn" onClick={handleUnload} disabled={!canUnload}>
+        <button
+          className="btn"
+          onClick={() => selectedPlugin && void handleUnload(selectedPlugin)}
+          disabled={!canUnload}
+        >
           Выгрузить
         </button>
 
@@ -248,6 +305,9 @@ export function PluginsWidget({ api }: Props) {
               onDoubleClick={() => {
                 if (!isFolder && p) setCardId(p.id);
               }}
+              onContextMenu={
+                p ? (e) => openPluginMenu(e, p) : undefined
+              }
             >
               <div
                 className="plugins-col-name"
@@ -273,7 +333,10 @@ export function PluginsWidget({ api }: Props) {
                 </span>
                 {isBusy && <span className="plugins-spinner">⟳</span>}
                 {p?.state === "Failed" && (
-                  <span className="plugins-failed" title="Ошибка загрузки плагина">
+                  <span
+                    className="plugins-failed"
+                    title="Ошибка загрузки плагина"
+                  >
                     ⚠
                   </span>
                 )}

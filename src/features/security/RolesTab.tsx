@@ -3,6 +3,7 @@ import type { SecurityApi } from "./api";
 import type { RoleRecord, UserRecord } from "./types";
 import { isReservedRole } from "./types";
 import { RolesMatrix } from "./RolesMatrix";
+import { act, sep, useContextMenu } from "../../components/context-menu";
 
 interface Props {
   api: SecurityApi;
@@ -22,6 +23,7 @@ type Editor =
   | { kind: "edit"; role: RoleRecord };
 
 export function RolesTab({ api, state, users, readonly }: Props) {
+  const { openContextMenu } = useContextMenu();
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [editor, setEditor] = useState<Editor>({ kind: "none" });
   const [busy, setBusy] = useState(false);
@@ -101,7 +103,10 @@ export function RolesTab({ api, state, users, readonly }: Props) {
         setToast(`Роль «${name}» создана`);
         setSelectedName(name);
       } else if (editor.kind === "edit") {
-        await api.updateRole(editor.role.name, { name, allowed_resources: resources });
+        await api.updateRole(editor.role.name, {
+          name,
+          allowed_resources: resources,
+        });
         setToast(`Роль «${name}» сохранена`);
         setSelectedName(name);
       }
@@ -131,15 +136,49 @@ export function RolesTab({ api, state, users, readonly }: Props) {
     }
   };
 
+  const openRowMenu = (e: React.MouseEvent, role: RoleRecord) => {
+    setSelectedName(role.name);
+    openContextMenu(e, [
+      act("Редактировать", () => setEditor({ kind: "edit", role }), {
+        disabled: !canEdit(role) || busy,
+      }),
+      sep(),
+      act("Удалить", () => setConfirmDelete(role), {
+        danger: true,
+        disabled: !canDelete(role) || busy,
+      }),
+      sep(),
+      act("Обновить", () => void state.reload(), {
+        disabled: state.loading || busy,
+      }),
+    ]);
+  };
+
+  const openBlankMenu = (e: React.MouseEvent) => {
+    openContextMenu(e, [
+      act("Создать роль", handleCreate, { disabled: readonly || busy }),
+      sep(),
+      act("Обновить", () => void state.reload(), {
+        disabled: state.loading || busy,
+      }),
+    ]);
+  };
+
   return (
-    <div className="sec-panel">
+    <div className="sec-panel" onContextMenu={openBlankMenu}>
       <div className="sec-toolbar">
-        <button className="btn" onClick={handleCreate} disabled={readonly || busy}>
+        <button
+          className="btn"
+          onClick={handleCreate}
+          disabled={readonly || busy}
+        >
           Создать
         </button>
         <button
           className="btn danger"
-          onClick={() => selected && canDelete(selected) && setConfirmDelete(selected)}
+          onClick={() =>
+            selected && canDelete(selected) && setConfirmDelete(selected)
+          }
           disabled={!selected || !canDelete(selected) || busy}
           title={deleteDisabledReason(selected)}
         >
@@ -183,6 +222,7 @@ export function RolesTab({ api, state, users, readonly }: Props) {
             selectedName={selectedName}
             userCounts={userCounts}
             onSelect={handleSelect}
+            onContextMenu={openRowMenu}
           />
           <RoleGroup
             label="Кастомные"
@@ -193,12 +233,15 @@ export function RolesTab({ api, state, users, readonly }: Props) {
             selectedName={selectedName}
             userCounts={userCounts}
             onSelect={handleSelect}
+            onContextMenu={openRowMenu}
           />
         </div>
 
         <div className="sec-props">
           {editor.kind === "none" && !selected && (
-            <div className="sec-hint props-hint">Выберите роль в дереве или нажмите «Создать»</div>
+            <div className="sec-hint props-hint">
+              Выберите роль в дереве или нажмите «Создать»
+            </div>
           )}
           {editor.kind === "none" && selected && (
             <RoleView
@@ -237,13 +280,18 @@ export function RolesTab({ api, state, users, readonly }: Props) {
             <h3>Удалить роль?</h3>
             <p>
               Роль <b>{confirmDelete.name}</b> будет удалена безвозвратно.
-              Пользователей с этой ролью: {userCounts.get(confirmDelete.name) ?? 0}.
+              Пользователей с этой ролью:{" "}
+              {userCounts.get(confirmDelete.name) ?? 0}.
             </p>
             <div className="modal-actions">
               <button className="btn" onClick={() => setConfirmDelete(null)}>
                 Отмена
               </button>
-              <button className="btn danger" onClick={handleDelete} disabled={busy}>
+              <button
+                className="btn danger"
+                onClick={handleDelete}
+                disabled={busy}
+              >
                 Удалить
               </button>
             </div>
@@ -265,6 +313,7 @@ interface RoleGroupProps {
   selectedName: string | null;
   userCounts: Map<string, number>;
   onSelect: (r: RoleRecord) => void;
+  onContextMenu: (e: React.MouseEvent, r: RoleRecord) => void;
 }
 
 function RoleGroup({
@@ -275,6 +324,7 @@ function RoleGroup({
   selectedName,
   userCounts,
   onSelect,
+  onContextMenu,
 }: RoleGroupProps) {
   return (
     <div className="sec-group">
@@ -293,8 +343,12 @@ function RoleGroup({
           return (
             <div
               key={r.name}
-              className={"sec-leaf" + (r.name === selectedName ? " is-selected" : "")}
+              className={
+                "sec-leaf" +
+                (r.name === selectedName ? " is-selected" : "")
+              }
               onClick={() => onSelect(r)}
+              onContextMenu={(e) => onContextMenu(e, r)}
             >
               <span className="icon">🛡</span>
               <span className="label">{r.name}</span>
@@ -347,14 +401,17 @@ function RoleView({ role, canEdit, userCount, onEdit }: RoleViewProps) {
             ) : role.allowed_resources.includes("*:read") ? (
               <span className="mono">*:read (только чтение)</span>
             ) : (
-              <span className="mono">{role.allowed_resources.length} шт.</span>
+              <span className="mono">
+                {role.allowed_resources.length} шт.
+              </span>
             )}
           </div>
         </div>
 
         {isBuiltin && (
           <div className="props-banner">
-            Встроенная роль. Её права определяются ядром, изменить или удалить нельзя.
+            Встроенная роль. Её права определяются ядром, изменить или удалить
+            нельзя.
           </div>
         )}
         {!isBuiltin && isReserved && (
@@ -366,7 +423,9 @@ function RoleView({ role, canEdit, userCount, onEdit }: RoleViewProps) {
         <div className="prop-row">
           <div className="prop-label">Список</div>
           <div className="prop-value">
-            <pre className="scope-list">{role.allowed_resources.join("\n")}</pre>
+            <pre className="scope-list">
+              {role.allowed_resources.join("\n")}
+            </pre>
           </div>
         </div>
       </div>
