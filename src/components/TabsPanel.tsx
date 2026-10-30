@@ -59,9 +59,9 @@ export function TabsPanel({
           />
         );
       case "connectors":
-        return <ConnectorsTab />;
-      case "plugins":
-        return <PluginsTab />;
+        return <ConnectorsTab server={server} />;
+      case "plugins": 
+        return <PluginsTab server={server} />;
       case "metrics":
         return <MetricsTab key={server.id} />;
       case "scripts":

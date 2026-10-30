@@ -1,0 +1,349 @@
+.connectors-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.connectors-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.connectors-spacer {
+  flex: 1;
+}
+
+.connectors-stats {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.connectors-main {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* -------- Левая панель: дерево -------- */
+
+.connectors-list {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 440px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background-color: var(--bg);
+}
+
+.connectors-list-header {
+  display: grid;
+  grid-template-columns: 1fr 50px minmax(80px, 1fr) 36px;
+  gap: 8px;
+  padding: 6px 10px;
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  user-select: none;
+}
+
+.connectors-list-header .col-enabled,
+.connectors-list-header .col-direction {
+  text-align: center;
+}
+
+.connectors-list-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.connectors-row {
+  display: grid;
+  grid-template-columns: 1fr 50px minmax(80px, 1fr) 36px;
+  gap: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  align-items: center;
+  font-size: 13px;
+  height: 28px;
+  box-sizing: border-box;
+}
+
+.connectors-row:hover {
+  background-color: var(--bg-hover-subtle);
+}
+
+.connectors-row.is-selected {
+  background-color: var(--accent);
+  color: var(--fg-inverse);
+}
+
+.connectors-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.connectors-cell.name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.connectors-cell.enabled {
+  text-align: center;
+}
+
+.connectors-cell.tags {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.connectors-cell.direction {
+  text-align: center;
+  font-size: 14px;
+}
+
+.connectors-row.is-selected .connectors-cell.tags {
+  color: var(--fg-inverse);
+}
+
+.connectors-chevron {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.connectors-row.is-selected .connectors-chevron {
+  color: var(--fg-inverse);
+}
+
+.connectors-chevron-placeholder {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.connectors-icon {
+  flex-shrink: 0;
+}
+
+.connectors-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connectors-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* -------- Правая панель: свойства -------- */
+
+.connectors-props {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background-color: var(--bg-panel);
+}
+
+.connectors-hint {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.connectors-hint.props-hint {
+  margin: auto;
+}
+
+.props-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.props-header {
+  padding: 8px 14px;
+  background-color: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.props-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  min-height: 0;
+}
+
+.props-field {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.props-field.align-top {
+  align-items: flex-start;
+}
+
+.props-field > label {
+  flex: 0 0 130px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--fg-label);
+  font-weight: 500;
+  padding-top: 6px;
+  line-height: 1.2;
+}
+
+.props-field.align-center > label {
+  padding-top: 0;
+}
+
+.props-field .req {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.props-field .props-value {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.props-field input[type="text"],
+.props-field input[type="password"],
+.props-field input[type="number"],
+.props-field select,
+.props-field textarea {
+  width: 100%;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg);
+  color: var(--fg);
+  box-sizing: border-box;
+}
+
+.props-field input[type="text"]:focus,
+.props-field input[type="password"]:focus,
+.props-field input[type="number"]:focus,
+.props-field select:focus,
+.props-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.props-field input:disabled,
+.props-field select:disabled,
+.props-field textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.props-field textarea {
+  resize: vertical;
+  min-height: 52px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.props-field .props-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.props-hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+  line-height: 1.3;
+}
+
+.props-section {
+  margin: 12px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-label);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.props-error {
+  color: var(--danger);
+  font-size: 12px;
+  padding: 6px 10px;
+  background-color: var(--danger-bg);
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+}
+
+.props-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background-color: var(--bg-toolbar);
+}
+
+.connectors-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background-color: var(--danger);
+  color: var(--fg-inverse);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  z-index: 1100;
+  box-shadow: var(--shadow-md);
+  max-width: 420px;
+  font-size: 13px;
+}
