@@ -285,6 +285,13 @@ export function createMockConnectorsApi(): ConnectorsApi {
       return computeStatus(state);
     },
 
+    async one(name: string) {
+      await delay(150);
+      const c = state.items.find((x) => x.name === name);
+      if (!c) throw new Error("Коннектор не найден");
+      return clone(c);
+    },
+
     async reload() {
       await delay(300);
     },
@@ -342,6 +349,20 @@ export function createMockConnectorsApi(): ConnectorsApi {
       const idx = state.items.findIndex((c) => c.name === name);
       if (idx < 0) throw new Error("Коннектор не найден");
       state.items.splice(idx, 1);
+    },
+
+    async enable(name: string) {
+      await delay(200);
+      const item = state.items.find((c) => c.name === name);
+      if (!item) throw new Error("Коннектор не найден");
+      item.enabled = true;
+    },
+
+    async disable(name: string) {
+      await delay(200);
+      const item = state.items.find((c) => c.name === name);
+      if (!item) throw new Error("Коннектор не найден");
+      item.enabled = false;
     },
 
     async test(name: string) {

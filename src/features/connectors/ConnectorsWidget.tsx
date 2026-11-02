@@ -75,6 +75,13 @@ export function ConnectorsWidget({ api }: Props) {
   const [prompt, setPrompt] = useState<PromptState>({ kind: "none" });
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
+  // --- карточка выбранного коннектора ---
+  const [details, setDetails] = useState<ConnectorInstance | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  // счётчик-триггер: бампается после сохранения, чтобы перезапросить карточку
+  const [detailsNonce, setDetailsNonce] = useState(0);
+
   const dragPayloadRef = useRef<DragPayload | null>(null);
   const dropCounterRef = useRef(0);
 
@@ -108,7 +115,51 @@ export function ConnectorsWidget({ api }: Props) {
   const selectedFolderPath =
     selectedNode?.type === "folder" ? selectedNode.path : null;
 
+    // details валиден только для текущего selectedConnector — иначе игнорируем.
+const detailsForCurrent = useMemo(
+  () =>
+    details && selectedConnector && details.name === selectedConnector.name
+      ? details
+      : null,
+  [details, selectedConnector],
+);
+
   const isFormOpen = creating || selectedConnector !== null;
+
+  // При выборе коннектора всегда запрашиваем карточку с сервера.
+  useEffect(() => {
+    if (creating || !selectedConnector) {
+      setDetails(null);
+      setDetailsError(null);
+      setDetailsLoading(false);
+      return;
+    }
+
+    let alive = true;
+    const ctrl = new AbortController();
+    setDetailsLoading(true);
+    setDetailsError(null);
+
+    api
+      .one(selectedConnector.name, ctrl.signal)
+      .then((d) => {
+        if (alive) setDetails(d);
+      })
+      .catch((e) => {
+        if (!alive) return;
+        if ((e as Error).name === "AbortError") return;
+        setDetailsError((e as Error).message);
+        setDetails(null);
+      })
+      .finally(() => {
+        if (alive) setDetailsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+      ctrl.abort();
+    };
+  }, [api, selectedConnector, creating, detailsNonce]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpanded((prev) => {
@@ -180,6 +231,7 @@ export function ConnectorsWidget({ api }: Props) {
         setSelectedKey(`conn:${input.name}`);
       }
       await reload();
+      setDetailsNonce((n) => n + 1);
     } catch (e) {
       setToast((e as Error).message);
     } finally {
@@ -651,6 +703,24 @@ export function ConnectorsWidget({ api }: Props) {
         </div>
 
         <div className="connectors-props">
+          {!creating && selectedConnector && detailsLoading && (
+            <div className="connectors-hint props-hint">
+              Загрузка карточки…
+            </div>
+          )}
+
+          {!creating && selectedConnector && detailsError && !detailsLoading && (
+            <div className="connectors-hint props-hint">
+              {detailsError}{" "}
+              <button
+                className="btn"
+                onClick={() => setDetailsNonce((n) => n + 1)}
+              >
+                Повторить
+              </button>
+            </div>
+          )}
+
           {!isFormOpen && selectedFolderPath === null && (
             <div className="connectors-hint props-hint">
               Выберите коннектор или папку в дереве
@@ -699,8 +769,14 @@ export function ConnectorsWidget({ api }: Props) {
 
           {isFormOpen && (
             <ConnectorProperties
-              key={creating ? "__new__" : selectedConnector!.name}
-              initialValue={creating ? null : selectedConnector}
+              key={
+                creating
+                  ? "__new__"
+                  : `${selectedConnector!.name}:${
+                      detailsForCurrent ? "loaded" : "loading"
+                    }:${detailsNonce}`
+              }
+              initialValue={creating ? null : (detailsForCurrent ?? selectedConnector)}
               templates={templates}
               templatesByType={templatesByType}
               folderPath={creating ? creatingInFolder : undefined}
@@ -709,6 +785,7 @@ export function ConnectorsWidget({ api }: Props) {
               saving={busy}
             />
           )}
+
         </div>
       </div>
 

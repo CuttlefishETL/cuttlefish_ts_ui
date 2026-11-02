@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ConnectorInput } from "./api";
 import type {
   ConnectorInstance,
   ConnectorTemplate,
+  DataType,
   Direction,
   ParamMeta,
 } from "./types";
@@ -18,6 +26,54 @@ interface Props {
 }
 
 const DIRECTIONS: Direction[] = ["Source", "Sink", "Duplex"];
+
+/* ---------- размеры блоков ---------- */
+const SPLITTER_HEIGHT = 6;
+const MIN_TOP = 100;
+const MIN_BOTTOM = 100;
+const DEFAULT_TOP = 240;
+const STORAGE_KEY = "cuttlefish.connectors.propsTopHeight";
+
+function loadTopHeight(): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const n = raw ? Number(raw) : NaN;
+    if (Number.isFinite(n) && n >= MIN_TOP) return n;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_TOP;
+}
+
+/** Тип параметра «на лету», если в шаблоне ключа нет. */
+function inferParamMeta(value: unknown, key: string): ParamMeta {
+  const k = key.toLowerCase();
+
+  if (typeof value === "boolean") {
+    return { data_type: "boolean", required: false, order: 999 };
+  }
+  if (typeof value === "number") {
+    return { data_type: "number", required: false, order: 999 };
+  }
+  if (Array.isArray(value)) {
+    return { data_type: "array", required: false, order: 999 };
+  }
+  if (value !== null && typeof value === "object") {
+    return { data_type: "object", required: false, order: 999 };
+  }
+
+  if (/(password|secret|token|api[_-]?key)/.test(k)) {
+    return { data_type: "secret", required: false, order: 999 };
+  }
+  if (/(url|uri|endpoint|host)/.test(k)) {
+    return { data_type: "uri", required: false, order: 999 };
+  }
+  return { data_type: "string", required: false, order: 999 };
+}
+
+function isNumericType(t: DataType): boolean {
+  return t === "integer" || t === "number";
+}
 
 export function ConnectorProperties({
   initialValue,
@@ -45,8 +101,81 @@ export function ConnectorProperties({
   );
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Черновик: если пользователь не трогал чекбокс в форме,
-  // синхронизируем его с изменением из списка.
+  /* ---------- вертикальный splitter ---------- */
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const [topHeight, setTopHeight] = useState<number>(loadTopHeight);
+  const [resizing, setResizing] = useState(false);
+
+  const clampTop = useCallback((h: number, totalH: number): number => {
+    const maxTop = Math.max(MIN_TOP, totalH - MIN_BOTTOM - SPLITTER_HEIGHT);
+    return Math.max(MIN_TOP, Math.min(maxTop, h));
+  }, []);
+
+  // После первого рендера (и при каждом появлении split-контейнера)
+  // подтягиваем topHeight к реальной высоте контейнера.
+  useLayoutEffect(() => {
+    const container = splitContainerRef.current;
+    if (!container) return;
+    const totalH = container.clientHeight;
+    if (totalH <= 0) return;
+    setTopHeight((h) => clampTop(h, totalH));
+  }, [clampTop]);
+
+  // Реагируем на resize окна/панели: не даём topHeight выйти за пределы.
+  useEffect(() => {
+    const container = splitContainerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(() => {
+      const totalH = container.clientHeight;
+      if (totalH <= 0) return;
+      setTopHeight((h) => clampTop(h, totalH));
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [clampTop]);
+
+  // Сохраняем актуальную высоту в localStorage при изменении.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, String(topHeight));
+    } catch {
+      /* ignore */
+    }
+  }, [topHeight]);
+
+  const startResize = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const container = splitContainerRef.current;
+      if (!container) return;
+
+      const startY = e.clientY;
+      const startH = topHeight;
+      const totalH = container.clientHeight;
+
+      const onMove = (ev: MouseEvent) => {
+        const dy = ev.clientY - startY;
+        setTopHeight(clampTop(startH + dy, totalH));
+      };
+
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        setResizing(false);
+      };
+
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
+      setResizing(true);
+    },
+    [topHeight, clampTop],
+  );
+
+  /* ---------- синхронизация с initialValue ---------- */
   const enabledDirtyRef = useRef(false);
 
   useEffect(() => {
@@ -58,22 +187,54 @@ export function ConnectorProperties({
   const currentTemplate = type ? templatesByType[type] : null;
 
   useEffect(() => {
+    setName(initialValue?.name ?? "");
+    setType(initialValue?.type ?? "");
+    setDirection(initialValue?.direction ?? "Duplex");
+    setEnabled(initialValue?.enabled ?? true);
+    setTags((initialValue?.tags ?? []).join(", "));
+    setDescription(initialValue?.description ?? "");
+    setParams(initialValue?.params ?? {});
+    setLocalError(null);
+    enabledDirtyRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValue]);
+
+  useEffect(() => {
     if (!currentTemplate) return;
     setParams((prev) => {
-      const next: Record<string, unknown> = {};
+      const next: Record<string, unknown> = { ...prev };
       for (const [key, meta] of Object.entries(currentTemplate.params)) {
-        next[key] = key in prev ? prev[key] : meta.default ?? "";
+        if (!(key in next)) next[key] = meta.default ?? "";
       }
       return next;
     });
   }, [currentTemplate]);
 
-  const sortedParams = useMemo(() => {
-    if (!currentTemplate) return [];
-    return Object.entries(currentTemplate.params).sort(
-      ([, a], [, b]) => a.order - b.order,
-    );
-  }, [currentTemplate]);
+  /* ---------- union параметров ---------- */
+  const paramEntries = useMemo(() => {
+    const result: Array<[string, ParamMeta, unknown]> = [];
+    const seen = new Set<string>();
+
+    if (currentTemplate) {
+      const entries = Object.entries(currentTemplate.params).sort(
+        ([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0),
+      );
+      for (const [key, meta] of entries) {
+        result.push([key, meta, params[key]]);
+        seen.add(key);
+      }
+    }
+
+    for (const key of Object.keys(params)) {
+      if (seen.has(key)) continue;
+      result.push([key, inferParamMeta(params[key], key), params[key]]);
+      seen.add(key);
+    }
+
+    return result;
+  }, [currentTemplate, params]);
+
+  const hasParams = paramEntries.length > 0;
 
   const setParam = (key: string, value: unknown) => {
     setParams((prev) => ({ ...prev, [key]: value }));
@@ -95,6 +256,7 @@ export function ConnectorProperties({
       setLocalError("Выберите направление");
       return;
     }
+
     if (currentTemplate) {
       for (const [key, meta] of Object.entries(currentTemplate.params)) {
         const val = params[key];
@@ -109,23 +271,27 @@ export function ConnectorProperties({
     }
 
     const normalizedParams: Record<string, unknown> = {};
-    if (currentTemplate) {
-      for (const [key, meta] of Object.entries(currentTemplate.params)) {
-        const raw = params[key];
-        if (meta.data_type === "object" || meta.data_type === "array") {
-          if (typeof raw === "string" && raw.trim()) {
-            try {
-              normalizedParams[key] = JSON.parse(raw);
-            } catch {
-              setLocalError(`Параметр «${key}»: невалидный JSON`);
-              return;
-            }
-          } else if (raw !== undefined) {
-            normalizedParams[key] = raw;
+    for (const [key, meta] of paramEntries) {
+      const raw = params[key];
+      if (meta.data_type === "object" || meta.data_type === "array") {
+        if (typeof raw === "string" && raw.trim()) {
+          try {
+            normalizedParams[key] = JSON.parse(raw);
+          } catch {
+            setLocalError(`Параметр «${key}»: невалидный JSON`);
+            return;
           }
+        } else if (raw !== undefined) {
+          normalizedParams[key] = raw;
+        }
+      } else if (isNumericType(meta.data_type)) {
+        if (raw === "" || raw === undefined || raw === null) {
+          // не отправляем пустое число
         } else {
           normalizedParams[key] = raw;
         }
+      } else {
+        normalizedParams[key] = raw;
       }
     }
 
@@ -158,105 +324,148 @@ export function ConnectorProperties({
         )}
       </div>
 
-      <div className="props-body">
-        <FieldRow label="Имя" required>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={saving}
-            autoFocus={!isEdit}
-          />
-        </FieldRow>
+      <div className="props-split-container" ref={splitContainerRef}>
+        {/* ---------- блок 1: основные поля ---------- */}
+        <div
+          className="props-block props-block-main"
+          style={
+            hasParams
+              ? { flex: `0 1 ${topHeight}px` }
+              : { flex: "1 1 0" }
+          }
+        >
+          <div className="props-body">
+            <FieldRow label="Имя" required>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={saving}
+                autoFocus={!isEdit}
+              />
+            </FieldRow>
 
-        <FieldRow label="Тип" required>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            disabled={saving || isEdit}
-            title={
-              isEdit
-                ? "Тип нельзя изменить у существующего коннектора"
-                : undefined
-            }
-          >
-            <option value="">— выберите —</option>
-            {templates.map((t) => (
-              <option key={t.type} value={t.type}>
-                {t.label} ({t.type})
-              </option>
-            ))}
-          </select>
-        </FieldRow>
+            <FieldRow label="Тип" required>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                disabled={saving || isEdit}
+                title={
+                  isEdit
+                    ? "Тип нельзя изменить у существующего коннектора"
+                    : undefined
+                }
+              >
+                <option value="">— выберите —</option>
+                {templates.map((t) => (
+                  <option key={t.type} value={t.type}>
+                    {t.label} ({t.type})
+                  </option>
+                ))}
+                {type && !templatesByType[type] && (
+                  <option value={type}>{type}</option>
+                )}
+              </select>
+            </FieldRow>
 
-        <FieldRow label="Направление" required>
-          <select
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as Direction)}
-            disabled={saving}
-          >
-            {DIRECTIONS.map((d) => (
-              <option key={d} value={d}>
-                {d === "Source"
-                  ? "📥 Источник"
-                  : d === "Sink"
-                    ? "📤 Приёмник"
-                    : "🔄 Двунаправленный"}
-              </option>
-            ))}
-          </select>
-        </FieldRow>
+            <FieldRow label="Направление" required>
+              <select
+                value={direction}
+                onChange={(e) => setDirection(e.target.value as Direction)}
+                disabled={saving}
+              >
+                {DIRECTIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d === "Source"
+                      ? "📥 Источник"
+                      : d === "Sink"
+                        ? "📤 Приёмник"
+                        : "🔄 Двунаправленный"}
+                  </option>
+                ))}
+              </select>
+            </FieldRow>
 
-        <FieldRow label="Включён">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => {
-              setEnabled(e.target.checked);
-              enabledDirtyRef.current = true;
-            }}
-            disabled={saving}
-            className="props-checkbox"
-          />
-        </FieldRow>
+            <FieldRow label="Включён">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => {
+                  setEnabled(e.target.checked);
+                  enabledDirtyRef.current = true;
+                }}
+                disabled={saving}
+                className="props-checkbox"
+              />
+            </FieldRow>
 
-        <FieldRow label="Теги">
-          <input
-            type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="api, prod"
-            disabled={saving}
-          />
-        </FieldRow>
-
-        <FieldRow label="Описание" align="top">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={saving}
-            rows={2}
-          />
-        </FieldRow>
-
-        {currentTemplate && sortedParams.length > 0 && (
-          <>
-            <div className="props-section">Параметры</div>
-            {sortedParams.map(([key, meta]) => (
-              <ParamRow
-                key={key}
-                name={key}
-                meta={meta}
-                value={params[key]}
-                onChange={(v) => setParam(key, v)}
+            <FieldRow label="Теги">
+              <input
+                type="text"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="api, prod"
                 disabled={saving}
               />
-            ))}
-          </>
+            </FieldRow>
+
+            <FieldRow label="Описание" align="top">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={saving}
+                rows={2}
+              />
+            </FieldRow>
+          </div>
+        </div>
+
+        {/* ---------- разделитель ---------- */}
+        {hasParams && (
+          <div
+            className={
+              "props-vsplitter" + (resizing ? " is-resizing" : "")
+            }
+            role="separator"
+            aria-orientation="horizontal"
+            title="Потяните, чтобы изменить высоту блоков"
+            onMouseDown={startResize}
+          />
         )}
 
-        {localError && <div className="props-error">{localError}</div>}
+        {/* ---------- блок 2: параметры ---------- */}
+        {hasParams && (
+          <div className="props-block props-block-params">
+            <div className="props-section">
+              Параметры
+              {currentTemplate && (
+                <span className="props-header-folder">
+                  {" "}— шаблон «{currentTemplate.label}»
+                </span>
+              )}
+              {!currentTemplate && (
+                <span className="props-header-folder">
+                  {" "}— нет шаблона, поля выведены из значений
+                </span>
+              )}
+            </div>
+            <div className="props-body">
+              {paramEntries.map(([key, meta]) => (
+                <ParamRow
+                  key={key}
+                  name={key}
+                  meta={meta}
+                  value={params[key]}
+                  onChange={(v) => setParam(key, v)}
+                  disabled={saving}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {localError && <div className="props-error">{localError}</div>}
 
       <div className="props-footer">
         <button className="btn primary" type="submit" disabled={saving}>
@@ -275,10 +484,15 @@ export function ConnectorProperties({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  FieldRow — с tooltip на label                                      */
+/* ------------------------------------------------------------------ */
+
 interface FieldRowProps {
   label: string;
   required?: boolean;
   align?: "center" | "top";
+  hint?: string;
   children: React.ReactNode;
 }
 
@@ -286,17 +500,30 @@ function FieldRow({
   label,
   required,
   align = "center",
+  hint,
   children,
 }: FieldRowProps) {
   return (
     <div className={"props-field align-" + align}>
-      <label>
+      <label
+        title={hint || undefined}
+        className={hint ? "has-hint" : undefined}
+      >
         {label} {required && <span className="req">*</span>}
+        {hint && (
+          <span className="props-hint-icon" aria-label={hint} title={hint}>
+            ?
+          </span>
+        )}
       </label>
       <div className="props-value">{children}</div>
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  ParamRow                                                           */
+/* ------------------------------------------------------------------ */
 
 interface ParamRowProps {
   name: string;
@@ -306,21 +533,15 @@ interface ParamRowProps {
   disabled: boolean;
 }
 
-function ParamRow({
-  name,
-  meta,
-  value,
-  onChange,
-  disabled,
-}: ParamRowProps) {
-  const hint = meta.description ? (
-    <div className="props-hint">{meta.description}</div>
-  ) : null;
-
+function ParamRow({ name, meta, value, onChange, disabled }: ParamRowProps) {
   return (
-    <FieldRow label={name} required={meta.required} align="top">
+    <FieldRow
+      label={name}
+      required={meta.required}
+      align="top"
+      hint={meta.description}
+    >
       {renderControl()}
-      {hint}
     </FieldRow>
   );
 

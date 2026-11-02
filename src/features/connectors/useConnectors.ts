@@ -63,22 +63,13 @@ export function useConnectors(api: ConnectorsApi) {
 
   const toggleEnabled = useCallback(
     async (c: ConnectorInstance): Promise<string | null> => {
+      const next = !c.enabled;
       setItems((prev) =>
-        prev.map((x) =>
-          x.name === c.name ? { ...x, enabled: !x.enabled } : x,
-        ),
+        prev.map((x) => (x.name === c.name ? { ...x, enabled: next } : x)),
       );
       try {
-        await api.update(c.name, {
-          name: c.name,
-          type: c.type,
-          enabled: !c.enabled,
-          description: c.description,
-          direction: c.direction,
-          tags: c.tags,
-          params: c.params,
-          metadata: c.metadata,
-        });
+        if (next) await api.enable(c.name);
+        else await api.disable(c.name);
         return null;
       } catch (e) {
         setItems((prev) =>
