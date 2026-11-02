@@ -1583,7 +1583,7 @@ export const reloadPluginHandler = (
     id: string, options?: AxiosRequestConfig
  ): Promise<AxiosResponse<void>> => {
     return axios.post(
-      `/api/plugins/${id}/reload`,
+      `/admin/plugins/${id}/reload`,
       undefined,options
     );
   }
@@ -1593,7 +1593,7 @@ export const getReloadPluginHandlerUrl = (id: string,) => {
     baseURL: '',
     params: null,
   }).getUri({
-    url: `/api/plugins/${id}/reload`,
+    url: `/admin/plugins/${id}/reload`,
     baseURL: '',
 
 

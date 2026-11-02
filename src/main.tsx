@@ -5,6 +5,9 @@ import App from "./App";
 import { installContextMenuGuard } from "./lib/disableContextMenu";
 import { ContextMenuProvider } from "./components/context-menu";
 
+import { migrateLegacyToken } from "./api/tokenStore";
+migrateLegacyToken();
+
 // Отключаем системное меню по правой кнопке (кроме полей ввода)
 installContextMenuGuard();
 

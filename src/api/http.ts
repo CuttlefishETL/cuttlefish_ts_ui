@@ -1,11 +1,22 @@
-import axios, { type AxiosInstance } from "axios";
+import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
+import { getToken, clearToken } from "./tokenStore";
 
-export const TOKEN_KEY = "cuttlefish.token";
+function resolveServerKey(
+  config: InternalAxiosRequestConfig | undefined,
+): string {
+  if (!config) return "";
+  if (config.baseURL) return config.baseURL;
+  const url = config.url ?? "";
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
 
-/**
- * Создаёт axios-клиент, привязанный к конкретному серверу.
- * Интерсепторы (JWT + 401) навешиваются на каждый клиент.
- */
 export function createApiClient(baseURL = ""): AxiosInstance {
   const client = axios.create({
     baseURL,
@@ -13,19 +24,22 @@ export function createApiClient(baseURL = ""): AxiosInstance {
   });
 
   client.interceptors.request.use((config) => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    const key = resolveServerKey(config);
+    const token = key ? getToken(key) : null;
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   });
 
   client.interceptors.response.use(
-    (response) => response,
+    (r) => r,
     (error) => {
       if (error.response?.status === 401) {
-        console.warn("Токен истёк или недействителен");
-        // TODO: logout / redirect / показать диалог
+        const key = resolveServerKey(error.config);
+        if (key) clearToken(key);
+        // сообщаем UI, что сессия этого сервера протухла
+        window.dispatchEvent(
+          new CustomEvent("auth:expired", { detail: { baseUrl: key } }),
+        );
       }
       return Promise.reject(error);
     },
@@ -34,5 +48,5 @@ export function createApiClient(baseURL = ""): AxiosInstance {
   return client;
 }
 
-/** Дефолтный клиент для случаев, когда baseURL подставляется в самом запросе. */
+/** Дефолтный клиент для запросов с абсолютным URL в config.url. */
 export const apiClient = createApiClient();

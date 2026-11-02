@@ -98,7 +98,7 @@ function computeStatus(state: MockState): PluginStatus {
   return {
     total: state.items.length,
     active: state.items.filter((x) => x.state === "Active").length,
-    api_version: 1,
+    api_version: "1.0.0",
     core_version: "1.4.2 (mock)",
   };
 }

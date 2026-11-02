@@ -1,35 +1,35 @@
-import { apiClient } from "./http";
+import { createApiClient } from "./http";
+import { getToken, setToken, clearToken } from "./tokenStore";
 
-interface LoginResponse {
+export interface LoginResponse {
   session_id: string;
   token: string;
 }
-
-const TOKEN_KEY = "cuttlefish.token";
 
 export async function login(
   baseUrl: string,
   username: string,
   password: string,
 ): Promise<LoginResponse> {
-  const response = await apiClient.post<LoginResponse>(
-    `${baseUrl}/auth/login`,
-    { username, password },
-  );
+  const client = createApiClient(baseUrl);
+  const response = await client.post<LoginResponse>("/auth/login", {
+    username,
+    password,
+  });
 
-  const { token } = response.data ?? {};
-  if (!token) {
-    throw new Error("Сервер не вернул токен");
-  }
+  const token = response.data?.token;
+  if (!token) throw new Error("Сервер не вернул токен");
 
-  localStorage.setItem(TOKEN_KEY, token);
+  setToken(baseUrl, token);
   return response.data;
 }
 
-export function logout() {
-  localStorage.removeItem(TOKEN_KEY);
+export function logout(baseUrl: string): void {
+  clearToken(baseUrl);
 }
 
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+export function isAuthenticated(baseUrl: string): boolean {
+  return getToken(baseUrl) !== null;
 }
+
+export { getToken };

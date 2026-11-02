@@ -20,7 +20,7 @@ export interface PluginListItem {
 export interface PluginStatus {
   total: number;
   active: number;
-  api_version: number;
+  api_version: string;
   core_version: string;
 }
 

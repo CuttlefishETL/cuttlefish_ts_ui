@@ -69,10 +69,19 @@ export function usePlugins(api: PluginsApi) {
 
   const toggle = useCallback(
     async (p: PluginListItem): Promise<string | null> => {
+      const next = !p.enabled;
       setPlugins((prev) =>
-        prev.map((x) => (x.id === p.id ? { ...x, enabled: !x.enabled } : x)),
+        prev.map((x) =>
+          x.id === p.id
+            ? {
+                ...x,
+                enabled: next,
+                state: next ? x.state : "Unloaded",
+              }
+            : x,
+        ),
       );
-      return runOp(p.id, () => api.toggle(p.id));
+      return runOp(p.id, () => api.toggle(p.id, next));
     },
     [api, runOp],
   );
