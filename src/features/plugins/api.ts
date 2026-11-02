@@ -1,92 +1,73 @@
+import type { AxiosError } from "axios";
+import { createApiClient, TOKEN_KEY as _TOKEN } from "../../api/http";
 import type { PluginListItem, PluginMetadata, PluginStatus } from "./types";
 
-const TOKEN_KEY = "cuttlefish.token";
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
+/** Приводим AxiosError к обычному Error с осмысленным сообщением. */
+function normalize(err: unknown): Error {
+  const ax = err as AxiosError<{ error?: string }>;
+  if (ax?.isAxiosError) {
+    const serverMsg = ax.response?.data?.error;
+    return new Error(serverMsg ?? ax.message);
+  }
+  return err instanceof Error ? err : new Error(String(err));
 }
 
 export function createPluginsApi(baseUrl: string) {
-  const json = async <T>(path: string, init?: RequestInit): Promise<T> => {
-    const res = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders(),
-        ...(init?.headers ?? {}),
-      },
-    });
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : undefined;
-    if (!res.ok) {
-      const msg = (data as { error?: string })?.error ?? `HTTP ${res.status}`;
-      throw new Error(msg);
+  const client = createApiClient(baseUrl);
+
+  const call = async <T>(p: Promise<{ data: T }>): Promise<T> => {
+    try {
+      return (await p).data;
+    } catch (e) {
+      throw normalize(e);
     }
-    return data as T;
   };
 
   return {
     list(signal?: AbortSignal) {
-      return json<PluginListItem[]>("/api/plugins", { signal });
+      return call<PluginListItem[]>(client.get("/api/plugins", { signal }));
     },
     status(signal?: AbortSignal) {
-      return json<PluginStatus>("/api/plugins/status", { signal });
+      return call<PluginStatus>(client.get("/api/plugins/status", { signal }));
     },
     one(id: string, signal?: AbortSignal) {
-      return json<PluginMetadata>(`/api/plugins/${encodeURIComponent(id)}`, { signal });
+      return call<PluginMetadata>(
+        client.get(`/api/plugins/${encodeURIComponent(id)}`, { signal }),
+      );
     },
     toggle(id: string) {
-      return json<void>(`/api/plugins/${encodeURIComponent(id)}/enable`, {
-        method: "POST",
-      });
+      return call<void>(client.post(`/api/plugins/${encodeURIComponent(id)}/enable`));
     },
     load(id: string) {
-      return json<void>(`/api/plugins/${encodeURIComponent(id)}/load`, {
-        method: "POST",
-      });
+      return call<void>(client.post(`/api/plugins/${encodeURIComponent(id)}/load`));
     },
     unload(id: string) {
-      return json<void>(`/api/plugins/${encodeURIComponent(id)}/unload`, {
-        method: "POST",
-      });
+      return call<void>(client.post(`/api/plugins/${encodeURIComponent(id)}/unload`));
     },
     remove(id: string) {
-      return json<void>(`/api/plugins/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
+      return call<void>(client.delete(`/api/plugins/${encodeURIComponent(id)}`));
     },
     async download(id: string): Promise<Blob> {
-      const res = await fetch(
-        `${baseUrl}/api/plugins/${encodeURIComponent(id)}/download`,
-        { headers: authHeaders() },
+      return call<Blob>(
+        client.get(`/api/plugins/${encodeURIComponent(id)}/download`, {
+          responseType: "blob",
+        }),
       );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.blob();
     },
-    upload(file: File, onProgress: (p: number) => void): Promise<void> {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${baseUrl}/api/plugins/upload`);
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            onProgress(Math.round((e.loaded / e.total) * 100));
-          }
-        };
-        xhr.onload = () =>
-          xhr.status >= 200 && xhr.status < 300
-            ? resolve()
-            : reject(new Error(`HTTP ${xhr.status}`));
-        xhr.onerror = () => reject(new Error("Сетевая ошибка"));
-        xhr.onabort = () => reject(new Error("Загрузка отменена"));
-
-        const form = new FormData();
-        form.append("file", file);
-        xhr.send(form);
-      });
+    async upload(file: File, onProgress: (p: number) => void): Promise<void> {
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        await client.post("/api/plugins/upload", form, {
+          // Content-Type выставит браузер (multipart + boundary).
+          // axios автоматически "снимает" дефолтный application/json для FormData.
+          onUploadProgress: (e) => {
+            if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+          },
+        });
+      } catch (e) {
+        throw normalize(e);
+      }
     },
   };
 }

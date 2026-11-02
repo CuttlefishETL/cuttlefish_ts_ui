@@ -298,6 +298,8 @@ function App() {
       <AuthDialog
         open={connections.authTarget !== null}
         serverName={connections.authTarget?.name || "(без имени)"}
+        serverUrl={connections.authTarget?.url ?? ""}
+        serverPort={connections.authTarget?.port ?? 0}
         onSubmit={connections.submitAuth}
         onCancel={connections.cancelAuth}
       />

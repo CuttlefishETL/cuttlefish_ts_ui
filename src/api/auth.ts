@@ -1,26 +1,35 @@
 import { apiClient } from "./http";
 
 interface LoginResponse {
-  access_token: string;
-  // возможно, другие поля
+  session_id: string;
+  token: string;
 }
+
+const TOKEN_KEY = "cuttlefish.token";
 
 export async function login(
   baseUrl: string,
   username: string,
-  password: string
+  password: string,
 ): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>(
-    `${baseUrl}/api/admin/login`,
-    { username, password }
+    `${baseUrl}/auth/login`,
+    { username, password },
   );
+
+  const { token } = response.data ?? {};
+  if (!token) {
+    throw new Error("Сервер не вернул токен");
+  }
+
+  localStorage.setItem(TOKEN_KEY, token);
   return response.data;
 }
 
 export function logout() {
-  localStorage.removeItem("cuttlefish.token");
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 export function getToken(): string | null {
-  return localStorage.getItem("cuttlefish.token");
+  return localStorage.getItem(TOKEN_KEY);
 }
