@@ -1,5 +1,5 @@
 import type { CronApi } from "./api";
-import type { CodeTreeNode, CronEntry } from "./types";
+import type { CronEntry } from "./types";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -48,37 +48,6 @@ const INITIAL: CronEntry[] = [
     section: "ingest",
     enabled: true,
   },
-];
-
-const SCRIPT_TREE: CodeTreeNode[] = [
-  {
-    name: "lua",
-    path: "lua",
-    type: "folder",
-    children: [
-      {
-        name: "connectors",
-        path: "lua/connectors",
-        type: "folder",
-        children: [
-          { name: "1_1.lua", path: "lua/connectors/1_1.lua", type: "file" },
-          { name: "1_2.lua", path: "lua/connectors/1_2.lua", type: "file" },
-        ],
-      },
-      {
-        name: "cron",
-        path: "lua/cron",
-        type: "folder",
-        children: [
-          { name: "start.lua", path: "lua/cron/start.lua", type: "file" },
-          { name: "cleanup.lua", path: "lua/cron/cleanup.lua", type: "file" },
-        ],
-      },
-    ],
-  },
-  { name: "report.lua", path: "report.lua", type: "file" },
-  { name: "plugin_test.lua", path: "plugin_test.lua", type: "file" },
-  { name: "transform_in.lua", path: "transform_in.lua", type: "file" },
 ];
 
 interface MockState {
@@ -144,11 +113,7 @@ export function createMockCronApi(): CronApi {
       const idx = state.items.findIndex((e) => e.name === name);
       if (idx < 0) throw new Error("Задача не найдена");
       state.items.splice(idx, 1);
-    },
-
-    async listScripts() {
-      await delay(150);
-      return SCRIPT_TREE;
+      return { success: true };
     },
 
     async listSections() {

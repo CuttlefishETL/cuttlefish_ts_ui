@@ -67,7 +67,7 @@ export function TabsPanel({
       case "metrics":
         return <MetricsTab key={server.id} />;
       case "scripts":
-        return <ScriptsTab />;
+        return <ScriptsTab key={server.id} server={server} />;
       case "cron":
         return <CronTab server={server} />; 
       case "security":

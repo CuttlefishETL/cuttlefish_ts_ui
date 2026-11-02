@@ -1,12 +1,16 @@
 import { useId, useState } from "react";
-import type { CodeTreeNode, CronEntry } from "./types";
+import type { CodeTreeNode } from "../code/types";
+import { ScriptPickerDialog } from "../code/ScriptPickerDialog";
+import type { CronEntry } from "./types";
 import { isValidSchedule } from "./types";
-import { ScriptPickerDialog } from "./ScriptPickerDialog";
 
 interface Props {
   initialValue: CronEntry | null;
   isNew: boolean;
   scripts: CodeTreeNode[];
+  scriptsLoading?: boolean;
+  scriptsError?: string | null;
+  onReloadScripts?: () => void;
   sections: string[];
   onSubmit: (entry: CronEntry, originalName: string | null) => Promise<void>;
   onCancel: () => void;
@@ -17,6 +21,9 @@ export function CronDialog({
   initialValue,
   isNew,
   scripts,
+  scriptsLoading,
+  scriptsError,
+  onReloadScripts,
   sections,
   onSubmit,
   onCancel,
@@ -37,6 +44,17 @@ export function CronDialog({
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  /**
+   * Каждое открытие picker'а — принудительный запрос свежего списка
+   * скриптов. `onReloadScripts()` синхронно ставит `loading = true`
+   * в родителе; `setPickerOpen(true)` — в том же батче. В результате
+   * picker сразу рисуется с «Загрузка…», без мигания пустого списка.
+   */
+  const openPicker = () => {
+    onReloadScripts?.();
+    setPickerOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,12 +141,18 @@ export function CronDialog({
                 <button
                   type="button"
                   className="btn"
-                  onClick={() => setPickerOpen(true)}
+                  onClick={openPicker}
                   disabled={saving}
+                  title="Выбрать из списка файлов"
                 >
                   …
                 </button>
               </div>
+              {scriptsError && (
+                <span className="field-hint cron-hint-error">
+                  Список скриптов недоступен: {scriptsError}
+                </span>
+              )}
             </div>
 
             <div className="field">
@@ -211,6 +235,10 @@ export function CronDialog({
       {pickerOpen && (
         <ScriptPickerDialog
           tree={scripts}
+          initialSelected={script || null}
+          loading={scriptsLoading}
+          errorMessage={scriptsError ?? null}
+          onReload={onReloadScripts}
           onSelect={(path) => {
             setScript(path);
             setPickerOpen(false);

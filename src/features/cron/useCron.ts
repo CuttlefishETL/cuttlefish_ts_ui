@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CronApi } from "./api";
-import type { CodeTreeNode, CronEntry } from "./types";
+import type { CronEntry } from "./types";
 import {
   getTaskSection,
   isDescendantOrSelf,
@@ -9,7 +9,6 @@ import {
 
 export function useCron(api: CronApi) {
   const [items, setItems] = useState<CronEntry[]>([]);
-  const [scripts, setScripts] = useState<CodeTreeNode[]>([]);
   const [sections, setSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,13 +17,11 @@ export function useCron(api: CronApi) {
     setLoading(true);
     setError(null);
     try {
-      const [list, tree, secs] = await Promise.all([
+      const [list, secs] = await Promise.all([
         api.list(),
-        api.listScripts(),
         api.listSections(),
       ]);
 
-      // Объединяем секции с теми, что упомянуты в задачах, включая промежуточные
       const merged = new Set(secs);
       for (const t of list) {
         const s = getTaskSection(t);
@@ -36,7 +33,6 @@ export function useCron(api: CronApi) {
       }
 
       setItems(list);
-      setScripts(tree);
       setSections(Array.from(merged).sort());
     } catch (e) {
       setError((e as Error).message);
@@ -241,7 +237,6 @@ export function useCron(api: CronApi) {
 
   return {
     items,
-    scripts,
     sections,
     loading,
     error,

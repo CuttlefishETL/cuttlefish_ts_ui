@@ -1,3 +1,5 @@
+export type { CodeTreeNode } from "../code/types";
+
 export interface CronEntry {
   name: string;
   schedule: string;
@@ -6,13 +8,6 @@ export interface CronEntry {
   section: string;
   enabled: boolean;
   description?: string;
-}
-
-export interface CodeTreeNode {
-  name: string;
-  path: string;
-  type: "folder" | "file";
-  children?: CodeTreeNode[];
 }
 
 export interface CronTreeNode {

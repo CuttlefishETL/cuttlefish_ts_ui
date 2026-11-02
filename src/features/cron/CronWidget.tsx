@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { CronApi } from "./api";
 import { useCron } from "./useCron";
+import { useCodeTree } from "../code/useCodeTree";
 import {
   allSectionKeys,
   buildCronTree,
@@ -26,6 +27,7 @@ import "./cron.css";
 
 interface Props {
   api: CronApi;
+  baseUrl: string;
 }
 
 type DialogState =
@@ -48,11 +50,11 @@ type DragPayload =
   | { kind: "task"; name: string }
   | { kind: "section"; path: string };
 
-export function CronWidget({ api }: Props) {
+export function CronWidget({ api, baseUrl }: Props) {
   const { openContextMenu } = useContextMenu();
+
   const {
     items,
-    scripts,
     sections,
     loading,
     error,
@@ -64,6 +66,21 @@ export function CronWidget({ api }: Props) {
     moveTask,
     moveSection,
   } = useCron(api);
+
+  // Единая точка получения скриптов. autoLoad: false —
+  // в cron данные грузятся только при открытии picker'а.
+  const {
+    tree: scripts,
+    loading: scriptsLoading,
+    error: scriptsError,
+    reload: reloadScripts,
+  } = useCodeTree(baseUrl, { autoLoad: false });
+
+  // Стабильная ссылка, чтобы useEffect в CronDialog
+  // (если он когда-то понадобится) не дёргался каждый рендер.
+  const reloadScriptsForced = useCallback(() => {
+    void reloadScripts(true);
+  }, [reloadScripts]);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -208,8 +225,6 @@ export function CronWidget({ api }: Props) {
     const err = await toggleEnabled(task);
     if (err) setToast(err);
   };
-
-  // -------- Prompt (section) --------
 
   const openCreateSection = (parent: string) => {
     setPrompt({ kind: "create-section", parent });
@@ -427,7 +442,9 @@ export function CronWidget({ api }: Props) {
         </button>
         <button
           className="btn"
-          onClick={() => selectedSectionPath && openRenameSection(selectedSectionPath)}
+          onClick={() =>
+            selectedSectionPath && openRenameSection(selectedSectionPath)
+          }
           disabled={!selectedSectionPath}
         >
           Переименовать
@@ -471,6 +488,9 @@ export function CronWidget({ api }: Props) {
 
         <span className="cron-stats">
           Задач: {items.length} · Секций: {sections.length}
+          {scriptsError && (
+            <span className="cron-hint-error"> · Скрипты недоступны</span>
+          )}
         </span>
       </div>
 
@@ -599,6 +619,9 @@ export function CronWidget({ api }: Props) {
           }
           isNew={true}
           scripts={scripts}
+          scriptsLoading={scriptsLoading}
+          scriptsError={scriptsError}
+          onReloadScripts={reloadScriptsForced}
           sections={sections}
           onSubmit={handleSubmit}
           onCancel={() => setDialog({ kind: "none" })}
@@ -611,6 +634,9 @@ export function CronWidget({ api }: Props) {
           initialValue={{ ...dialog.initial, section: dialog.section }}
           isNew={true}
           scripts={scripts}
+          scriptsLoading={scriptsLoading}
+          scriptsError={scriptsError}
+          onReloadScripts={reloadScriptsForced}
           sections={sections}
           onSubmit={handleSubmit}
           onCancel={() => setDialog({ kind: "none" })}
@@ -623,6 +649,9 @@ export function CronWidget({ api }: Props) {
           initialValue={dialog.initial}
           isNew={false}
           scripts={scripts}
+          scriptsLoading={scriptsLoading}
+          scriptsError={scriptsError}
+          onReloadScripts={reloadScriptsForced}
           sections={sections}
           onSubmit={handleSubmit}
           onCancel={() => setDialog({ kind: "none" })}

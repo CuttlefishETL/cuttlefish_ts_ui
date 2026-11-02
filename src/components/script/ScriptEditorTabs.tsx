@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { StreamLanguage } from "@codemirror/language";
 import { lua } from "@codemirror/legacy-modes/mode/lua";
-import { EditorView } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import {
   breakpointField,
   breakpointGutter,
@@ -19,6 +19,7 @@ interface OpenFile {
   path: string;
   name: string;
   content: string;
+  dirty?: boolean;
 }
 
 interface PendingScroll {
@@ -34,6 +35,7 @@ interface ScriptEditorTabsProps {
   onActivate: (path: string) => void;
   onClose: (path: string) => void;
   onChange: (path: string, content: string) => void;
+  onSave: (path: string) => void;
   onBreakpointsChange: (path: string, bps: BreakpointMap) => void;
   onScrollHandled: () => void;
 }
@@ -48,6 +50,7 @@ export function ScriptEditorTabs({
   onActivate,
   onClose,
   onChange,
+  onSave,
   onBreakpointsChange,
   onScrollHandled,
 }: ScriptEditorTabsProps) {
@@ -61,8 +64,12 @@ export function ScriptEditorTabs({
             key={file.path}
             className={`script-tab ${activePath === file.path ? "active" : ""}`}
             onClick={() => onActivate(file.path)}
+            title={file.path}
           >
-            <span>{file.name}</span>
+            <span>
+              {file.name}
+              {file.dirty && <span className="tab-dirty"> •</span>}
+            </span>
             <button
               type="button"
               className="tab-close"
@@ -91,6 +98,7 @@ export function ScriptEditorTabs({
             visible={activePath === file.path}
             pendingScroll={pendingScroll}
             onChange={(content) => onChange(file.path, content)}
+            onSave={() => onSave(file.path)}
             onBreakpointsChange={(bps) =>
               onBreakpointsChange(file.path, bps)
             }
@@ -111,6 +119,7 @@ function ScriptEditor({
   visible,
   pendingScroll,
   onChange,
+  onSave,
   onBreakpointsChange,
   onScrollHandled,
 }: {
@@ -119,13 +128,14 @@ function ScriptEditor({
   visible: boolean;
   pendingScroll: PendingScroll | null;
   onChange: (content: string) => void;
+  onSave: () => void;
   onBreakpointsChange: (bps: BreakpointMap) => void;
   onScrollHandled: () => void;
 }) {
   const [isDark, setIsDark] = useState(
     () =>
       typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-color-scheme: dark)").matches
+      window.matchMedia?.("(prefers-color-scheme: dark)").matches,
   );
 
   useEffect(() => {
@@ -144,6 +154,9 @@ function ScriptEditor({
 
   const onBpChangeRef = useRef(onBreakpointsChange);
   onBpChangeRef.current = onBreakpointsChange;
+
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
 
   const onCreateEditor = useCallback((view: EditorView) => {
     viewRef.current = view;
@@ -190,31 +203,38 @@ function ScriptEditor({
       breakpointGutter,
       breakpointKeymap,
       breakpointTheme,
+      keymap.of([
+        {
+          key: "Mod-s",
+          preventDefault: true,
+          run: () => {
+            onSaveRef.current();
+            return true;
+          },
+        },
+      ]),
       EditorView.updateListener.of((update) => {
         const hasBpEffect = update.transactions.some((tr) =>
           tr.effects.some(
             (e) =>
-              e.is(toggleBreakpointEffect) || e.is(setBreakpointsEffect)
-          )
+              e.is(toggleBreakpointEffect) || e.is(setBreakpointsEffect),
+          ),
         );
         if (hasBpEffect) {
           onBpChangeRef.current(getBreakpoints(update.view));
         }
       }),
     ],
-    []
+    [],
   );
 
   const handleChange = useCallback(
     (value: string) => onChange(value),
-    [onChange]
+    [onChange],
   );
 
   return (
-    <div
-      className="scripts-editor"
-      style={{ display: visible ? "block" : "none" }}
-    >
+    <div className={"scripts-editor" + (visible ? "" : " is-hidden")}>
       <CodeMirror
         value={file.content}
         height="100%"

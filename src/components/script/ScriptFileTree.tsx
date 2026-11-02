@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { ScriptFileNode } from "../../scriptStub";
+import type { CodeTreeNode } from "../../features/code/types";
 import type { BreakpointMap } from "./breakpointField";
 
 interface ScriptFileTreeProps {
-  nodes: ScriptFileNode[];
+  nodes: CodeTreeNode[];
   activePath: string | null;
   breakpointsByFile: Record<string, BreakpointMap>;
   onOpen: (path: string) => void;
@@ -19,7 +19,7 @@ export function ScriptFileTree({
     <div className="scripts-tree">
       {nodes.map((node) => (
         <TreeNode
-          key={node.path}
+          key={node.path || node.name}
           node={node}
           depth={0}
           activePath={activePath}
@@ -32,15 +32,16 @@ export function ScriptFileTree({
 }
 
 function countBreakpoints(
-  node: ScriptFileNode,
-  breakpointsByFile: Record<string, BreakpointMap>
+  node: CodeTreeNode,
+  breakpointsByFile: Record<string, BreakpointMap>,
 ): number {
   if (node.type === "file") {
     return breakpointsByFile[node.path]?.size ?? 0;
   }
-  return (node.children ?? []).reduce(
+  const children: CodeTreeNode[] = node.children ?? [];
+  return children.reduce<number>(
     (sum, child) => sum + countBreakpoints(child, breakpointsByFile),
-    0
+    0,
   );
 }
 
@@ -51,7 +52,7 @@ function TreeNode({
   breakpointsByFile,
   onOpen,
 }: {
-  node: ScriptFileNode;
+  node: CodeTreeNode;
   depth: number;
   activePath: string | null;
   breakpointsByFile: Record<string, BreakpointMap>;
@@ -61,6 +62,7 @@ function TreeNode({
   const bpCount = countBreakpoints(node, breakpointsByFile);
 
   if (node.type === "folder") {
+    const children: CodeTreeNode[] = node.children ?? [];
     return (
       <div>
         <div
@@ -77,9 +79,9 @@ function TreeNode({
           )}
         </div>
         {open &&
-          node.children?.map((child) => (
+          children.map((child: CodeTreeNode) => (
             <TreeNode
-              key={child.path}
+              key={child.path || child.name}
               node={child}
               depth={depth + 1}
               activePath={activePath}
@@ -95,6 +97,7 @@ function TreeNode({
     <div
       className={`tree-file ${activePath === node.path ? "active" : ""}`}
       style={{ paddingLeft: 8 + depth * 12 + 14 }}
+      title={node.path}
       onClick={() => onOpen(node.path)}
     >
       <span className="tree-name">{node.name}</span>
