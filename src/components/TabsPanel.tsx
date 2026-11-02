@@ -7,6 +7,7 @@ import { ScriptsTab } from "./tabs/ScriptsTab";
 import { CronTab } from "./tabs/CronTab";
 import { SecurityTab } from "./tabs/SecurityTab";
 import { TabView } from "./tabs/TabView";
+import { ConfigTab } from "./tabs/ConfigTab";
 
 interface TabsPanelProps {
   servers: Server[];
@@ -121,7 +122,7 @@ export function TabsPanel({
             </TabView>
 
             <TabView active={renderedTab === "metrics"}>
-              <MetricsTab />
+              <MetricsTab server={activeServer} />
             </TabView>
 
             {/*
@@ -139,6 +140,10 @@ export function TabsPanel({
             <TabView active={renderedTab === "security"}>
               <SecurityTab server={activeServer} />
             </TabView>
+
+            <TabView active={renderedTab === "config"}>
+              <ConfigTab server={activeServer} />
+            </TabView>            
           </div>
         </div>
       ) : (

@@ -1,27 +1,21 @@
 import { useMemo, useState } from "react";
-import type {
-  MetricCheckState,
-  MetricGroup,
-  MetricNode,
-} from "../../types";
-import { METRIC_NAMES, DEFAULT_ENABLED_METRICS } from "../../data";
-import {
-  collectGroupIds,
-  collectLeafIds,
-  computeGroupState,
-  isMetricGroup,
-  parseMetrics,
-  toggleGroupLeaves,
-} from "../../metricsUtils";
+import type { Server } from "../../types";
+import { buildBaseUrl } from "../../checkConnection";
+import { createMetricsApi } from "../../features/metrics/api";
+import { useMetrics } from "../../features/metrics/useMetrics";
+import type { MetricItem } from "../../features/metrics/types";
+import type { MetricCheckState } from "../../types";
 
 function TriCheckbox({
   state,
   onChange,
   label,
+  disabled,
 }: {
   state: MetricCheckState;
   onChange: () => void;
   label: string;
+  disabled?: boolean;
 }) {
   const isPartial = state === "indeterminate";
   const isChecked = state === "checked" || isPartial;
@@ -34,147 +28,121 @@ function TriCheckbox({
       onChange={onChange}
       aria-label={label}
       aria-checked={isPartial ? "mixed" : undefined}
+      disabled={disabled}
     />
   );
 }
 
-export function MetricsTab() {
-  const tree = useMemo(() => parseMetrics(METRIC_NAMES), []);
-  const allLeafIds = useMemo(
-    () => tree.flatMap(collectLeafIds),
-    [tree],
+interface Props {
+  server: Server;
+}
+
+export function MetricsTab({ server }: Props) {
+  const baseUrl = useMemo(() => {
+    try {
+      return buildBaseUrl(server.url, server.port);
+    } catch {
+      return "";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [server.url, server.port]);
+
+  const api = useMemo(
+    () => (baseUrl ? createMetricsApi(baseUrl) : null),
+    [baseUrl],
+  );
+  const {
+    sections,
+    stats,
+    enabledPaths,
+    loading,
+    error,
+    busyKeys,
+    reloading,
+    reload,
+    reloadFromFile,
+    toggleMetric,
+    toggleSection,
+  } = useMetrics(api);
+
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const sectionNames = useMemo(
+    () => Object.keys(sections).sort(),
+    [sections],
   );
 
-  const [enabled, setEnabled] = useState<Set<string>>(
-    () => new Set(DEFAULT_ENABLED_METRICS),
-  );
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(collectGroupIds(tree)),
-  );
+  const totalSections = sectionNames.length;
+
+  const isExpanded = (sec: string) =>
+    expanded.has(sec) || !collapsed.has(sec);
+
+  const toggleExpanded = (sec: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(sec)) next.delete(sec);
+      else next.add(sec);
+      setExpanded((p) => {
+        const np = new Set(p);
+        np.add(sec);
+        return np;
+      });
+      return next;
+    });
+  };
+
+  const computeSectionState = (sec: string): MetricCheckState => {
+    const list = sections[sec] ?? [];
+    if (list.length === 0) return "unchecked";
+    const on = list.filter((m) => m.enabled).length;
+    if (on === 0) return "unchecked";
+    if (on === list.length) return "checked";
+    return "indeterminate";
+  };
+
+  const handleToggleSection = (sec: string) => {
+    const state = computeSectionState(sec);
+    const next = state !== "checked";
+    void toggleSection(sec, next);
+  };
+
+  const handleToggleMetric = (m: MetricItem) => {
+    void toggleMetric(m.path, !m.enabled);
+  };
+
+  const handleEnableAll = () => {
+    for (const sec of sectionNames) {
+      if (computeSectionState(sec) !== "checked") {
+        void toggleSection(sec, true);
+      }
+    }
+  };
+
+  const handleDisableAll = () => {
+    for (const sec of sectionNames) {
+      if (computeSectionState(sec) !== "unchecked") {
+        void toggleSection(sec, false);
+      }
+    }
+  };
 
   const allEnabled =
-    allLeafIds.length > 0 && allLeafIds.every((id) => enabled.has(id));
-  const noneEnabled = allLeafIds.every((id) => !enabled.has(id));
+    sectionNames.length > 0 &&
+    sectionNames.every((s) => computeSectionState(s) === "checked");
+  const noneEnabled = sectionNames.every(
+    (s) => computeSectionState(s) === "unchecked",
+  );
 
-  const enableAll = () => {
-    setEnabled(new Set(allLeafIds));
-  };
-
-  const disableAll = () => {
-    setEnabled(new Set());
-  };
-
-  const toggleExpanded = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleLeaf = (id: string) => {
-    setEnabled((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleGroup = (group: MetricGroup) => {
-    const { ids, turnOn } = toggleGroupLeaves(group, enabled);
-    setEnabled((prev) => {
-      const next = new Set(prev);
-      for (const id of ids) {
-        if (turnOn) next.add(id);
-        else next.delete(id);
-      }
-      return next;
-    });
-  };
-
-  const renderNodes = (
-    nodes: MetricNode[],
-    depth: number,
-  ): React.ReactNode =>
-    nodes.map((node) => {
-      if (isMetricGroup(node)) {
-        const isOpen = expanded.has(node.id);
-        const state = computeGroupState(node, enabled);
-        return (
-          <li key={node.id} className="metrics-node">
-            <div
-              className="metrics-row"
-              style={{ paddingLeft: 8 + depth * 16 }}
-            >
-              <button
-                type="button"
-                className={`metrics-chevron${isOpen ? " is-open" : ""}`}
-                onClick={() => toggleExpanded(node.id)}
-                aria-label={isOpen ? "Свернуть" : "Развернуть"}
-              >
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 10 10"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 1 L7 5 L3 9"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <span className="metrics-name" title={node.id}>
-                {node.name}
-              </span>
-              <span className="metrics-check-cell">
-                <TriCheckbox
-                  state={state}
-                  onChange={() => toggleGroup(node)}
-                  label={node.id}
-                />
-              </span>
-            </div>
-            {isOpen && node.children.length > 0 && (
-              <ul className="metrics-subtree">
-                {renderNodes(node.children, depth + 1)}
-              </ul>
-            )}
-          </li>
-        );
-      }
-
-      const checked = enabled.has(node.id);
-      return (
-        <li key={node.id} className="metrics-node">
-          <div
-            className="metrics-row"
-            style={{ paddingLeft: 8 + depth * 16 }}
-          >
-            <span
-              className="metrics-chevron metrics-chevron--placeholder"
-              aria-hidden="true"
-            />
-            <span className="metrics-name" title={node.id}>
-              {node.name}
-            </span>
-            <span className="metrics-check-cell">
-              <TriCheckbox
-                state={checked ? "checked" : "unchecked"}
-                onChange={() => toggleLeaf(node.id)}
-                label={node.id}
-              />
-            </span>
-          </div>
-        </li>
-      );
-    });
+  if (!baseUrl) {
+    return (
+      <div className="metrics-tab">
+        <div className="metrics-hint">
+          Не удалось определить адрес сервера (проверьте URL и порт).
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="metrics-tab">
@@ -182,26 +150,168 @@ export function MetricsTab() {
         <button
           type="button"
           className="btn"
-          onClick={enableAll}
-          disabled={allEnabled || allLeafIds.length === 0}
+          onClick={handleEnableAll}
+          disabled={allEnabled || loading || sectionNames.length === 0}
         >
           Включить все
         </button>
         <button
           type="button"
           className="btn"
-          onClick={disableAll}
-          disabled={noneEnabled}
+          onClick={handleDisableAll}
+          disabled={noneEnabled || loading || sectionNames.length === 0}
         >
           Выключить все
         </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void reloadFromFile()}
+          disabled={loading || reloading}
+          title="POST /api/metrics/reload — перечитать состояние из файла"
+        >
+          {reloading ? "Перезагрузка…" : "Перезагрузить"}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void reload()}
+          disabled={loading}
+        >
+          Обновить
+        </button>
+
+        <span className="metrics-toolbar-spacer" />
+        {stats && (
+          <span className="metrics-stats">
+            Всего: {stats.total} · Вкл: {stats.enabled} · Выкл:{" "}
+            {stats.disabled}
+          </span>
+        )}
       </div>
 
-      <div className="metrics-header">
-        <span className="metrics-header-name">Наименование</span>
-        <span className="metrics-header-check">Использование</span>
-      </div>
-      <ul className="metrics-tree">{renderNodes(tree, 0)}</ul>
+      {loading && sectionNames.length === 0 && (
+        <div className="metrics-hint">Загрузка метрик…</div>
+      )}
+      {!loading && error && sectionNames.length === 0 && (
+        <div className="metrics-hint">
+          {error}{" "}
+          <button className="btn" onClick={() => void reload()}>
+            Повторить
+          </button>
+        </div>
+      )}
+      {!loading && !error && sectionNames.length === 0 && (
+        <div className="metrics-hint">Метрики не найдены</div>
+      )}
+
+      {!loading && error && sectionNames.length > 0 && (
+        <div className="metrics-error-banner">{error}</div>
+      )}
+
+      {sectionNames.length > 0 && (
+        <>
+          <div className="metrics-header">
+            <span className="metrics-header-name">Наименование</span>
+            <span className="metrics-header-check">Использование</span>
+          </div>
+          <ul className="metrics-tree">
+            {sectionNames.map((sec) => {
+              const list = sections[sec] ?? [];
+              const open = isExpanded(sec);
+              const state = computeSectionState(sec);
+              const sectionBusy = busyKeys.has(`section:${sec}`);
+              return (
+                <li key={sec} className="metrics-node">
+                  <div className="metrics-row metrics-row--section">
+                    <button
+                      type="button"
+                      className={`metrics-chevron${open ? " is-open" : ""}`}
+                      onClick={() => toggleExpanded(sec)}
+                      aria-label={open ? "Свернуть" : "Развернуть"}
+                    >
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 10 10"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M3 1 L7 5 L3 9"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <span className="metrics-name metrics-name--section" title={sec}>
+                      {sec}
+                      <span className="metrics-count">{list.length}</span>
+                    </span>
+                    <span className="metrics-check-cell">
+                      <TriCheckbox
+                        state={state}
+                        onChange={() => handleToggleSection(sec)}
+                        label={`section ${sec}`}
+                        disabled={sectionBusy}
+                      />
+                    </span>
+                  </div>
+                  {open && list.length > 0 && (
+                    <ul className="metrics-subtree">
+                      {list.map((m) => {
+                        const busy = busyKeys.has(m.path);
+                        return (
+                          <li key={m.path} className="metrics-node">
+                            <div
+                              className="metrics-row"
+                              style={{ paddingLeft: 8 + 32 }}
+                              title={m.path}
+                            >
+                              <span
+                                className="metrics-chevron metrics-chevron--placeholder"
+                                aria-hidden="true"
+                              />
+                              <span className="metrics-name">
+                                {m.path}
+                                {m.metadata?.description && (
+                                  <span className="metrics-description">
+                                    {" "}
+                                    — {m.metadata.description}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="metrics-check-cell">
+                                <TriCheckbox
+                                  state={m.enabled ? "checked" : "unchecked"}
+                                  onChange={() => handleToggleMetric(m)}
+                                  label={m.path}
+                                  disabled={busy}
+                                />
+                              </span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      {enabledPaths.size === 0 && sectionNames.length > 0 && !loading && (
+        <div className="metrics-footnote">
+          Все метрики выключены — на сервере не собирается телеметрия.
+        </div>
+      )}
+      {totalSections === 0 && !loading && !error && (
+        <div className="metrics-footnote">Секций с метриками нет.</div>
+      )}
     </div>
   );
 }

@@ -114,3 +114,79 @@ input.metrics-check--partial {
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
+
+.metrics-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.metrics-toolbar-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.metrics-stats {
+  font-size: 12px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.metrics-hint {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.metrics-error-banner {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  margin: 6px 0;
+}
+
+.metrics-row--section {
+  font-weight: 600;
+  background-color: var(--bg-panel);
+}
+
+.metrics-name--section {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metrics-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background-color: var(--bg-hover-subtle);
+  color: var(--fg-muted);
+}
+
+.metrics-description {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.metrics-footnote {
+  font-size: 12px;
+  color: var(--fg-muted);
+  padding: 8px 12px;
+  font-style: italic;
+}

@@ -1,0 +1,386 @@
+.config-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.config-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.config-filter input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.config-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.config-stats {
+  font-size: 12px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.config-pending-count {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* -------- Основная область: дерево | splitter | редактор -------- */
+
+.config-main {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  gap: 0; /* визуальный разделитель даёт Splitter */
+}
+
+.config-tree-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;      /* ширина задаётся inline через style */
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background-color: var(--bg);
+}
+
+.config-tree-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 4px 0;
+}
+
+.config-section {
+  margin-bottom: 4px;
+}
+
+.config-section-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.config-section-row:hover {
+  background-color: var(--bg-hover-subtle);
+}
+
+.config-chevron {
+  width: 12px;
+  font-size: 10px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.config-section-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background-color: var(--bg-hover-subtle);
+  color: var(--fg-muted);
+}
+
+.config-param-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 28px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid transparent;
+}
+
+.config-param-row:hover {
+  background-color: var(--bg-hover-subtle);
+}
+
+.config-param-row.is-selected {
+  background-color: var(--accent);
+  color: var(--fg-inverse);
+}
+
+.config-param-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.config-param-row.is-selected .config-param-path {
+  color: var(--fg-inverse);
+}
+
+.config-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.config-badge--pending {
+  color: var(--danger);
+}
+
+.config-badge--ro {
+  color: var(--fg-muted);
+}
+
+.config-badge--restart {
+  background-color: var(--danger-bg);
+  color: var(--danger);
+  padding: 0 6px;
+}
+
+.config-param-row.is-selected .config-badge--pending,
+.config-param-row.is-selected .config-badge--ro {
+  color: var(--fg-inverse);
+}
+
+.config-editor-wrap {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  background-color: var(--bg-panel);
+  padding: 12px 14px;
+}
+
+.config-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.config-editor-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.config-editor-path {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  word-break: break-all;
+}
+
+.config-editor-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.config-editor-description {
+  font-size: 12px;
+  color: var(--fg-muted);
+  line-height: 1.4;
+}
+
+.config-editor-type {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.config-editor-type code {
+  background-color: var(--bg-hover-subtle);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.config-editor-required {
+  color: var(--danger);
+}
+
+.config-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-editor-field > label {
+  font-size: 12px;
+  color: var(--fg-label);
+  font-weight: 500;
+}
+
+.config-editor-field input[type="text"],
+.config-editor-field input[type="number"],
+.config-editor-field input[type="date"],
+.config-editor-field select,
+.config-editor-field textarea {
+  width: 100%;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input, var(--bg));
+  color: var(--fg);
+  box-sizing: border-box;
+}
+
+.config-editor-field input:focus,
+.config-editor-field select:focus,
+.config-editor-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.config-editor-field input:disabled,
+.config-editor-field select:disabled,
+.config-editor-field textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.config-editor-field textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.config-editor-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.config-editor-hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.config-editor-hint code {
+  background-color: var(--bg-hover-subtle);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.config-editor-error {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.config-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.config-hint {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.config-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background-color: var(--accent);
+  color: var(--fg-inverse);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  z-index: 1100;
+  box-shadow: var(--shadow-md);
+  max-width: 420px;
+  font-size: 13px;
+}
+
+.config-editor-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.config-editor-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
