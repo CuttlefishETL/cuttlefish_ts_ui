@@ -2,26 +2,27 @@ export type SessionSource = "Admin" | "HTTP" | "Cron" | "Manual" | "Internal";
 
 export interface ActiveSession {
   session_id: string;
-  user_id: number;
   user_name: string;
   role: string;
   debug: boolean;
   source: SessionSource;
   created_at: string;
   last_used: string;
-  is_current: boolean;
+  is_current?: boolean;
 }
 
 export interface UserRecord {
-  id: number;
   username: string;
   role: string;
 }
 
 export interface RoleRecord {
   name: string;
-  privilege: "Admin" | "Viewer" | null;
   allowed_resources: string[];
+  max_connections: number;
+  uses: number;
+  users: number;
+  privilege: "admin" | "viewer" | null;
 }
 
 export interface RoleInput {
@@ -40,7 +41,7 @@ export interface UserUpdateInput {
   role?: string;
 }
 
-export type Privilege = "Admin" | "Viewer" | null;
+export type Privilege = "admin" | "viewer" | null;
 
 /** Полный каталог скупов: ресурс → список действий. */
 export const RESOURCE_ACTIONS: Record<string, string[]> = {
@@ -54,7 +55,6 @@ export const RESOURCE_ACTIONS: Record<string, string[]> = {
   audit: ["read"],
 };
 
-/** Порядок ресурсов в матрице. */
 export const RESOURCE_ORDER: string[] = [
   "config",
   "metrics",
@@ -66,7 +66,6 @@ export const RESOURCE_ORDER: string[] = [
   "audit",
 ];
 
-/** Союз всех действий (для колонок матрицы). */
 export const ALL_ACTIONS: string[] = [
   "read",
   "write",
@@ -78,7 +77,11 @@ export const ALL_ACTIONS: string[] = [
   "sync",
 ];
 
-export function hasScope(resources: string[], resource: string, action: string): boolean {
+export function hasScope(
+  resources: string[],
+  resource: string,
+  action: string,
+): boolean {
   if (resources.includes("*")) return true;
   if (resources.includes("*:read") && action === "read") return true;
   return resources.includes(`${resource}:${action}`);
@@ -94,7 +97,9 @@ export function groupUsersByRole(users: UserRecord[]): {
     admin: users.filter((u) => u.role === "admin"),
     user: users.filter((u) => u.role === "user"),
     viewer: users.filter((u) => u.role === "viewer"),
-    other: users.filter((u) => !["admin", "user", "viewer"].includes(u.role)),
+    other: users.filter(
+      (u) => !["admin", "user", "viewer"].includes(u.role),
+    ),
   };
 }
 
@@ -147,8 +152,9 @@ export interface RoleCreateInput {
   allowed_resources: string[];
 }
 
-export const RESERVED_ROLE_NAMES = ["admin", "viewer", "user"] as const;
-export const ROLE_NAME_RE = /^[a-z][a-z0-9_-]{0,63}$/;
+export const RESERVED_ROLE_NAMES = ["admin"] as const;
+/** Сервер принимает `[A-Za-z0-9_.-]`, длина 1–64. */
+export const ROLE_NAME_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
 export function isReservedRole(name: string): boolean {
   return (RESERVED_ROLE_NAMES as readonly string[]).includes(name);
@@ -157,9 +163,8 @@ export function isReservedRole(name: string): boolean {
 export function validateRoleName(name: string): string | null {
   if (!name) return "Имя обязательно";
   if (!ROLE_NAME_RE.test(name)) {
-    return "Имя: строчные латинские буквы, цифры, _ и -, начинается с буквы, до 64 символов";
+    return "Имя: 1–64 символа, A-Za-z0-9_.-";
   }
-  if (isReservedRole(name)) return "Это имя зарезервировано";
+  if (isReservedRole(name)) return "Имя «admin» зарезервировано";
   return null;
 }
-

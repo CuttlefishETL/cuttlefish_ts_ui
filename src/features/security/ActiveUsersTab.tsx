@@ -68,7 +68,7 @@ export function ActiveUsersTab({
     }
     setBusy(true);
     try {
-      await api.deleteUserSessions(user.user_id);
+      await api.deleteUserSessions(user.user_name);
       setToast(`Все сессии «${user.user_name}» завершены`);
       setSelectedId(null);
       await state.reload();
@@ -99,14 +99,17 @@ export function ActiveUsersTab({
   };
 
   return (
-    <div className="sec-panel" onContextMenu={(e) => {
-      openContextMenu(e, [
-        sep(),
-        act("Обновить", () => void state.reload(), {
-          disabled: state.loading || busy,
-        }),
-      ]);
-    }}>
+    <div
+      className="sec-panel"
+      onContextMenu={(e) => {
+        openContextMenu(e, [
+          sep(),
+          act("Обновить", () => void state.reload(), {
+            disabled: state.loading || busy,
+          }),
+        ]);
+      }}
+    >
       <div className="sec-toolbar">
         <button
           className="btn"
@@ -204,7 +207,9 @@ export function ActiveUsersTab({
                     "—"
                   )}
                 </div>
-                <div className="cell muted">{formatRelative(s.last_used)}</div>
+                <div className="cell muted">
+                  {formatRelative(s.last_used)}
+                </div>
               </div>
             );
           })}
@@ -223,8 +228,8 @@ export function ActiveUsersTab({
               <span className="mono">
                 {shortSessionId(confirmTerminate.session_id)}
               </span>{" "}
-              пользователя <b>{confirmTerminate.user_name}</b> будет немедленно
-              завершена.
+              пользователя <b>{confirmTerminate.user_name}</b> будет
+              немедленно завершена.
             </p>
             <div className="modal-actions">
               <button

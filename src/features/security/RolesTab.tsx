@@ -383,6 +383,20 @@ function RoleView({ role, canEdit, userCount, onEdit }: RoleViewProps) {
           <div className="prop-value">{role.privilege ?? "—"}</div>
         </div>
         <div className="prop-row">
+          <div className="prop-label">Max connections</div>
+          <div className="prop-value">
+            {role.max_connections === 0
+              ? "по умолчанию"
+              : role.max_connections}
+          </div>
+        </div>
+        <div className="prop-row">
+          <div className="prop-label">Uses (на сессию)</div>
+          <div className="prop-value">
+            {role.uses === 0 ? "∞ (без лимита)" : role.uses}
+          </div>
+        </div>
+        <div className="prop-row">
           <div className="prop-label">Пользователей</div>
           <div className="prop-value">
             {userCount}

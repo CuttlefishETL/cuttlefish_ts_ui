@@ -1,59 +1,74 @@
 import { useMemo } from "react";
 import type { Server } from "../../types";
-import { createMockSecurityApi } from "../../features/security/mockApi";
+import { buildBaseUrl } from "../../checkConnection";
+import { createSecurityApi } from "../../features/security/api";
 import { SecurityWidget } from "../../features/security/SecurityWidget";
+import { getToken } from "../../api/tokenStore";
 
-/** true — виджет работает на встроенных моках, false — на реальном ядре. */
-const USE_MOCK_API = true;
+interface JwtClaims {
+  sub?: string;
+  role?: string;
+  exp?: number;
+}
+
+function decodeJwt(token: string): JwtClaims {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return {};
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(json) as JwtClaims;
+  } catch {
+    return {};
+  }
+}
 
 interface Props {
   server: Server;
 }
 
-function readAuthFromStorage(): {
-  sessionId: string | null;
-  role: string;
-  expiresAt: string | null;
-} {
-  const token = localStorage.getItem("cuttlefish.token");
-  if (!token) {
-    return { sessionId: null, role: "admin", expiresAt: null };
-  }
-  try {
-    const [, payload] = token.split(".");
-    const data = JSON.parse(atob(payload));
-    return {
-      sessionId: data.sub ?? null,
-      role: data.role ?? "user",
-      expiresAt: data.exp ? new Date(data.exp * 1000).toISOString() : null,
-    };
-  } catch {
-    return { sessionId: null, role: "user", expiresAt: null };
-  }
-}
-
 export function SecurityTab({ server }: Props) {
-  const api = useMemo(() => {
-    if (USE_MOCK_API) return createMockSecurityApi();
+  const baseUrl = useMemo(() => {
+    try {
+      return buildBaseUrl(server.url, server.port);
+    } catch {
+      return "";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [server.url, server.port]);
 
-    // Когда появится реальный API:
-    // const baseUrl =
-    //   server.url.startsWith("http://") || server.url.startsWith("https://")
-    //     ? server.url.replace(/\/$/, "")
-    //     : `http://${server.url}:${server.port}`;
-    // return createSecurityApi(baseUrl);
+  const api = useMemo(
+    () => (baseUrl ? createSecurityApi(baseUrl) : null),
+    [baseUrl],
+  );
 
-    return createMockSecurityApi();
-  }, [server]);
+  const claims = useMemo<JwtClaims>(() => {
+    if (!baseUrl) return {};
+    const token = getToken(baseUrl);
+    return token ? decodeJwt(token) : {};
+  }, [baseUrl]);
 
-  const auth = useMemo(() => readAuthFromStorage(), []);
+  const currentSessionId = claims.sub ?? null;
+  const currentRole = claims.role ?? "";
+  const tokenExpiresAt = claims.exp
+    ? new Date(claims.exp * 1000).toISOString()
+    : null;
+
+  if (!baseUrl || !api) {
+    return (
+      <div className="security-tab">
+        <div className="sec-hint">
+          Не удалось определить адрес сервера (проверьте URL и порт).
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SecurityWidget
       api={api}
-      currentSessionId={auth.sessionId}
-      currentRole={auth.role}
-      tokenExpiresAt={auth.expiresAt}
+      currentSessionId={currentSessionId}
+      currentRole={currentRole}
+      tokenExpiresAt={tokenExpiresAt}
     />
   );
 }

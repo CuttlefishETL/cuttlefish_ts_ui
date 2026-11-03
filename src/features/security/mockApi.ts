@@ -8,13 +8,14 @@ import { isReservedRole, validateRoleName } from "./types";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-const SESSIONS_SEED: Array<Omit<ActiveSession, "last_used" | "created_at"> & {
-  offsetMs: number;
-  createdAtMs: number;
-}> = [
+const SESSIONS_SEED: Array<
+  Omit<ActiveSession, "last_used" | "created_at"> & {
+    offsetMs: number;
+    createdAtMs: number;
+  }
+> = [
   {
     session_id: "a3f2b1c8-4d5e-4f7a-9b2c-1e3d4f5a6b7c",
-    user_id: 1,
     user_name: "admin",
     role: "admin",
     debug: false,
@@ -25,7 +26,6 @@ const SESSIONS_SEED: Array<Omit<ActiveSession, "last_used" | "created_at"> & {
   },
   {
     session_id: "9b81c2d7-3e4f-5a6b-7c8d-9e0f1a2b3c4d",
-    user_id: 2,
     user_name: "operator",
     role: "user",
     debug: false,
@@ -36,7 +36,6 @@ const SESSIONS_SEED: Array<Omit<ActiveSession, "last_used" | "created_at"> & {
   },
   {
     session_id: "4c10d3e5-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
-    user_id: 3,
     user_name: "integration",
     role: "user",
     debug: true,
@@ -47,7 +46,6 @@ const SESSIONS_SEED: Array<Omit<ActiveSession, "last_used" | "created_at"> & {
   },
   {
     session_id: "7e2da8b1-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
-    user_id: 4,
     user_name: "auditor",
     role: "viewer",
     debug: false,
@@ -59,22 +57,28 @@ const SESSIONS_SEED: Array<Omit<ActiveSession, "last_used" | "created_at"> & {
 ];
 
 const USERS_SEED: UserRecord[] = [
-  { id: 1, username: "admin", role: "admin" },
-  { id: 2, username: "operator", role: "user" },
-  { id: 3, username: "integration", role: "user" },
-  { id: 4, username: "auditor", role: "viewer" },
+  { username: "admin", role: "admin" },
+  { username: "operator", role: "user" },
+  { username: "integration", role: "user" },
+  { username: "auditor", role: "viewer" },
 ];
 
 const ROLES_SEED: RoleRecord[] = [
   {
     name: "admin",
-    privilege: "Admin",
+    privilege: "admin",
     allowed_resources: ["*"],
+    max_connections: 10,
+    uses: 0,
+    users: 1,
   },
   {
     name: "viewer",
-    privilege: "Viewer",
+    privilege: "viewer",
     allowed_resources: ["*:read"],
+    max_connections: 2,
+    uses: 0,
+    users: 1,
   },
   {
     name: "user",
@@ -91,6 +95,9 @@ const ROLES_SEED: RoleRecord[] = [
       "session:manage",
       "audit:read",
     ],
+    max_connections: 5,
+    uses: 100,
+    users: 2,
   },
 ];
 
@@ -98,14 +105,12 @@ interface MockState {
   sessions: ActiveSession[];
   users: UserRecord[];
   roles: RoleRecord[];
-  nextUserId: number;
 }
 
 function buildSessions(): ActiveSession[] {
   const now = Date.now();
   return SESSIONS_SEED.map((s) => ({
     session_id: s.session_id,
-    user_id: s.user_id,
     user_name: s.user_name,
     role: s.role,
     debug: s.debug,
@@ -116,6 +121,16 @@ function buildSessions(): ActiveSession[] {
   }));
 }
 
+function recomputeRoleUserCounts(state: MockState) {
+  const counts = new Map<string, number>();
+  for (const u of state.users) {
+    counts.set(u.role, (counts.get(u.role) ?? 0) + 1);
+  }
+  for (const r of state.roles) {
+    r.users = counts.get(r.name) ?? 0;
+  }
+}
+
 export function createMockSecurityApi(): SecurityApi {
   const state: MockState = {
     sessions: buildSessions(),
@@ -124,14 +139,13 @@ export function createMockSecurityApi(): SecurityApi {
       ...r,
       allowed_resources: [...r.allowed_resources],
     })),
-    nextUserId: 5,
   };
+  recomputeRoleUserCounts(state);
 
   return {
-    // ---------- Sessions ----------
+    // ---------- SESSIONS ----------
     async listSessions() {
       await delay(180);
-      // «освежаем» last_used при каждом запросе
       state.sessions = state.sessions.map((s) => ({
         ...s,
         last_used: new Date(
@@ -147,7 +161,9 @@ export function createMockSecurityApi(): SecurityApi {
 
     async deleteSession(sessionId: string) {
       await delay(250);
-      const idx = state.sessions.findIndex((s) => s.session_id === sessionId);
+      const idx = state.sessions.findIndex(
+        (s) => s.session_id === sessionId,
+      );
       if (idx < 0) throw new Error("Сессия не найдена");
       if (state.sessions[idx].is_current) {
         throw new Error("Нельзя завершить собственную сессию");
@@ -155,18 +171,18 @@ export function createMockSecurityApi(): SecurityApi {
       state.sessions.splice(idx, 1);
     },
 
-    async deleteUserSessions(userId: number) {
+    async deleteUserSessions(username: string) {
       await delay(250);
       const before = state.sessions.length;
       state.sessions = state.sessions.filter(
-        (s) => s.user_id !== userId || s.is_current,
+        (s) => s.user_name !== username || s.is_current,
       );
       if (state.sessions.length === before) {
         throw new Error("Нет сессий для завершения");
       }
     },
 
-    // ---------- Users ----------
+    // ---------- USERS ----------
     async listUsers() {
       await delay(180);
       return state.users.map((u) => ({ ...u }));
@@ -183,19 +199,23 @@ export function createMockSecurityApi(): SecurityApi {
         throw new Error("Роль не существует");
       }
       const u: UserRecord = {
-        id: state.nextUserId++,
         username: input.username.trim(),
         role: input.role,
       };
       state.users.push(u);
+      recomputeRoleUserCounts(state);
       return { ...u };
     },
 
-    async updateUser(id, input) {
+    async updateUser(oldUsername, input) {
       await delay(250);
-      const user = state.users.find((u) => u.id === id);
+      const user = state.users.find((u) => u.username === oldUsername);
       if (!user) throw new Error("Пользователь не найден");
-      if (user.username === "admin" && input.role && input.role !== "admin") {
+      if (
+        user.username === "admin" &&
+        input.role &&
+        input.role !== "admin"
+      ) {
         throw new Error("Нельзя изменить роль пользователя admin");
       }
       if (
@@ -210,38 +230,60 @@ export function createMockSecurityApi(): SecurityApi {
       }
       if (input.username) user.username = input.username.trim();
       if (input.role) user.role = input.role;
+      recomputeRoleUserCounts(state);
       return { ...user };
     },
 
-    async changePassword(id, password) {
+    async changePassword(username, password) {
       await delay(250);
-      if (!state.users.some((u) => u.id === id)) {
+      if (!state.users.some((u) => u.username === username)) {
         throw new Error("Пользователь не найден");
       }
       if (!password) throw new Error("Пароль обязателен");
       // в моке пароль не хранится
     },
 
-    async deleteUser(id) {
+    async deleteUser(username) {
       await delay(250);
-      const idx = state.users.findIndex((u) => u.id === id);
+      const idx = state.users.findIndex((u) => u.username === username);
       if (idx < 0) throw new Error("Пользователь не найден");
       if (state.users[idx].username === "admin") {
         throw new Error("Нельзя удалить пользователя admin");
       }
-      if (state.sessions.some((s) => s.user_id === id)) {
+      if (state.sessions.some((s) => s.user_name === username)) {
         throw new Error("Нельзя удалить пользователя с активными сессиями");
       }
       state.users.splice(idx, 1);
+      recomputeRoleUserCounts(state);
     },
 
-    // ---------- Roles ----------
+    // ---------- ROLES ----------
     async listRoles() {
       await delay(180);
       return state.roles.map((r) => ({
         ...r,
         allowed_resources: [...r.allowed_resources],
       }));
+    },
+
+    async createRole(input) {
+      await delay(280);
+      const err = validateRoleName(input.name);
+      if (err) throw new Error(err);
+      if (state.roles.some((r) => r.name === input.name)) {
+        throw new Error("Роль с таким именем уже существует");
+      }
+      const role: RoleRecord = {
+        name: input.name,
+        privilege: null,
+        allowed_resources: [...input.allowed_resources],
+        max_connections: 0,
+        uses: 0,
+        users: 0,
+      };
+      state.roles.push(role);
+      recomputeRoleUserCounts(state);
+      return { ...role, allowed_resources: [...role.allowed_resources] };
     },
 
     async updateRole(name, input) {
@@ -254,21 +296,6 @@ export function createMockSecurityApi(): SecurityApi {
       role.allowed_resources = [...input.allowed_resources];
       return { ...role, allowed_resources: [...role.allowed_resources] };
     },
-    async createRole(input) {
-      await delay(280);
-      const err = validateRoleName(input.name);
-      if (err) throw new Error(err);
-      if (state.roles.some((r) => r.name === input.name)) {
-        throw new Error("Роль с таким именем уже существует");
-      }
-      const role: RoleRecord = {
-        name: input.name,
-        privilege: null,
-        allowed_resources: [...input.allowed_resources],
-      };
-      state.roles.push(role);
-      return { ...role, allowed_resources: [...role.allowed_resources] };
-    },
 
     async deleteRole(name) {
       await delay(250);
@@ -279,18 +306,16 @@ export function createMockSecurityApi(): SecurityApi {
         throw new Error("Встроенную роль нельзя удалить");
       }
       if (isReservedRole(name)) {
-        throw new Error(`Роль «${name}» зарезервирована и не может быть удалена`);
+        throw new Error(`Роль «${name}» зарезервирована`);
       }
-      const usedBy = state.users.filter((u) => u.role === name);
-      if (usedBy.length > 0) {
+      if (role.users > 0) {
         throw new Error(
-          `Роль используется ${usedBy.length} пользовател${
-            usedBy.length === 1 ? "ем" : "ями"
+          `Роль используется ${role.users} пользовател${
+            role.users === 1 ? "ем" : "ями"
           }. Сначала измените их роль.`,
         );
       }
       state.roles.splice(idx, 1);
     },
-        
   };
 }

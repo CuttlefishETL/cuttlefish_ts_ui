@@ -24,7 +24,7 @@ type Editor =
 
 export function UsersTab({ api, state, roles, readonly }: Props) {
   const { openContextMenu } = useContextMenu();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
   const [editor, setEditor] = useState<Editor>({ kind: "none" });
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -33,7 +33,8 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
     () => new Set(["admin", "user", "viewer", "other"]),
   );
 
-  const selected = state.data.find((u) => u.id === selectedId) ?? null;
+  const selected =
+    state.data.find((u) => u.username === selectedUsername) ?? null;
   const grouped = useMemo(() => groupUsersByRole(state.data), [state.data]);
 
   useEffect(() => {
@@ -53,11 +54,11 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
 
   const handleSelect = (user: UserRecord) => {
     setEditor({ kind: "none" });
-    setSelectedId(user.id);
+    setSelectedUsername(user.username);
   };
 
   const handleCreate = () => {
-    setSelectedId(null);
+    setSelectedUsername(null);
     setEditor({ kind: "create" });
   };
 
@@ -75,15 +76,19 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
           role: data.role,
         });
         setToast(`Пользователь «${data.username}» создан`);
+        setSelectedUsername(data.username);
       } else if (editor.kind === "edit") {
-        await api.updateUser(editor.user.id, {
+        const oldUsername = editor.user.username;
+        await api.updateUser(oldUsername, {
           username: data.username,
           role: data.role,
         });
         if (data.password) {
-          await api.changePassword(editor.user.id, data.password);
+          // после возможного переименования username на сервере — новый
+          await api.changePassword(data.username, data.password);
         }
         setToast(`Пользователь «${data.username}» обновлён`);
+        setSelectedUsername(data.username);
       }
       setEditor({ kind: "none" });
       await state.reload();
@@ -100,9 +105,9 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
     setConfirmDelete(null);
     setBusy(true);
     try {
-      await api.deleteUser(u.id);
+      await api.deleteUser(u.username);
       setToast(`Пользователь «${u.username}» удалён`);
-      if (selectedId === u.id) setSelectedId(null);
+      if (selectedUsername === u.username) setSelectedUsername(null);
       await state.reload();
     } catch (e) {
       setToast((e as Error).message);
@@ -122,20 +127,24 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
   };
 
   const openRowMenu = (e: React.MouseEvent, user: UserRecord) => {
-    setSelectedId(user.id);
+    setSelectedUsername(user.username);
     openContextMenu(e, [
       act("Редактировать", () => setEditor({ kind: "edit", user }), {
         disabled: !canEdit(user) || busy,
       }),
-      act("Сбросить пароль", () => {
-        const pwd = window.prompt(`Новый пароль для «${user.username}»:`);
-        if (pwd) {
-          void api
-            .changePassword(user.id, pwd)
-            .then(() => setToast("Пароль обновлён"))
-            .catch((err) => setToast((err as Error).message));
-        }
-      }, { disabled: readonly || busy }),
+      act(
+        "Сбросить пароль",
+        () => {
+          const pwd = window.prompt(`Новый пароль для «${user.username}»:`);
+          if (pwd) {
+            void api
+              .changePassword(user.username, pwd)
+              .then(() => setToast("Пароль обновлён"))
+              .catch((err) => setToast((err as Error).message));
+          }
+        },
+        { disabled: readonly || busy },
+      ),
       sep(),
       act("Удалить", () => setConfirmDelete(user), {
         danger: true,
@@ -150,7 +159,9 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
 
   const openBlankMenu = (e: React.MouseEvent) => {
     openContextMenu(e, [
-      act("Создать пользователя", handleCreate, { disabled: readonly || busy }),
+      act("Создать пользователя", handleCreate, {
+        disabled: readonly || busy,
+      }),
       sep(),
       act("Обновить", () => void state.reload(), {
         disabled: state.loading || busy,
@@ -218,7 +229,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
             users={grouped.admin}
             expanded={expanded.has("admin")}
             onToggle={() => toggleGroup("admin")}
-            selectedId={selectedId}
+            selectedUsername={selectedUsername}
             onSelect={handleSelect}
             onContextMenu={openRowMenu}
           />
@@ -228,7 +239,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
             users={grouped.user}
             expanded={expanded.has("user")}
             onToggle={() => toggleGroup("user")}
-            selectedId={selectedId}
+            selectedUsername={selectedUsername}
             onSelect={handleSelect}
             onContextMenu={openRowMenu}
           />
@@ -238,7 +249,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
             users={grouped.viewer}
             expanded={expanded.has("viewer")}
             onToggle={() => toggleGroup("viewer")}
-            selectedId={selectedId}
+            selectedUsername={selectedUsername}
             onSelect={handleSelect}
             onContextMenu={openRowMenu}
           />
@@ -249,7 +260,7 @@ export function UsersTab({ api, state, roles, readonly }: Props) {
               users={grouped.other}
               expanded={expanded.has("other")}
               onToggle={() => toggleGroup("other")}
-              selectedId={selectedId}
+              selectedUsername={selectedUsername}
               onSelect={handleSelect}
               onContextMenu={openRowMenu}
             />
@@ -315,7 +326,7 @@ interface GroupProps {
   users: UserRecord[];
   expanded: boolean;
   onToggle: () => void;
-  selectedId: number | null;
+  selectedUsername: string | null;
   onSelect: (u: UserRecord) => void;
   onContextMenu: (e: React.MouseEvent, u: UserRecord) => void;
 }
@@ -325,7 +336,7 @@ function UserGroup({
   users,
   expanded,
   onToggle,
-  selectedId,
+  selectedUsername,
   onSelect,
   onContextMenu,
 }: GroupProps) {
@@ -340,9 +351,10 @@ function UserGroup({
       {expanded &&
         users.map((u) => (
           <div
-            key={u.id}
+            key={u.username}
             className={
-              "sec-leaf" + (u.id === selectedId ? " is-selected" : "")
+              "sec-leaf" +
+              (u.username === selectedUsername ? " is-selected" : "")
             }
             onClick={() => onSelect(u)}
             onContextMenu={(e) => onContextMenu(e, u)}
@@ -368,9 +380,14 @@ function UserView({ user, canEdit, onEdit, readonly }: UserViewProps) {
     <div className="props">
       <div className="props-header">Пользователь «{user.username}»</div>
       <div className="props-body">
-        <PropRow label="ID">{user.id}</PropRow>
-        <PropRow label="Имя">{user.username}</PropRow>
-        <PropRow label="Роль">{user.role}</PropRow>
+        <div className="prop-row">
+          <div className="prop-label">Имя</div>
+          <div className="prop-value mono">{user.username}</div>
+        </div>
+        <div className="prop-row">
+          <div className="prop-label">Роль</div>
+          <div className="prop-value">{user.role}</div>
+        </div>
         {user.username === "admin" && (
           <div className="props-banner">
             Встроенный администратор. Роль нельзя изменить, пользователя нельзя
@@ -385,21 +402,6 @@ function UserView({ user, canEdit, onEdit, readonly }: UserViewProps) {
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-function PropRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="prop-row">
-      <div className="prop-label">{label}</div>
-      <div className="prop-value">{children}</div>
     </div>
   );
 }
@@ -437,7 +439,8 @@ function UserForm({
     e.preventDefault();
     setError(null);
     if (!username.trim()) return setError("Имя обязательно");
-    if (!isEdit && !password) return setError("Пароль обязателен при создании");
+    if (!isEdit && !password)
+      return setError("Пароль обязателен при создании");
     await onSave({
       username: username.trim(),
       role,
@@ -506,10 +509,19 @@ function UserForm({
         {error && <div className="props-error">{error}</div>}
       </div>
       <div className="props-footer">
-        <button className="btn primary" type="submit" disabled={busy || readonly}>
+        <button
+          className="btn primary"
+          type="submit"
+          disabled={busy || readonly}
+        >
           Сохранить
         </button>
-        <button className="btn" type="button" onClick={onCancel} disabled={busy}>
+        <button
+          className="btn"
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+        >
           Отмена
         </button>
       </div>
