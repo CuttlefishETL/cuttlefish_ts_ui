@@ -28,5 +28,5 @@ export function ConnectorsTab({ server }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [server.url, server.port]);
 
-  return <ConnectorsWidget api={api} />;
+  return <ConnectorsWidget api={api} server={server} />;
 }

@@ -25,10 +25,14 @@ import {
 } from "./types";
 import { PromptDialog } from "../../components/PromptDialog";
 import { act, sep, useContextMenu } from "../../components/context-menu";
+import { buildBaseUrl } from "../../checkConnection";
 import "./connectors.css";
+
+import type { Server } from "../../types";
 
 interface Props {
   api: ConnectorsApi;
+  server: Server;
 }
 
 type DragPayload =
@@ -45,7 +49,7 @@ type ConfirmState =
   | { kind: "folder"; path: string }
   | null;
 
-export function ConnectorsWidget({ api }: Props) {
+export function ConnectorsWidget({ api, server }: Props) {
   const { openContextMenu } = useContextMenu();
 
   const {
@@ -64,6 +68,16 @@ export function ConnectorsWidget({ api }: Props) {
     moveConnector,
     moveFolder,
   } = useConnectors(api);
+
+  /* ---------- baseUrl для скриптов (грузятся по клику, не заранее) ---------- */
+  const scriptBaseUrl = useMemo(() => {
+    try {
+      return buildBaseUrl(server.url, server.port);
+    } catch {
+      return "";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [server.url, server.port]);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -115,14 +129,14 @@ export function ConnectorsWidget({ api }: Props) {
   const selectedFolderPath =
     selectedNode?.type === "folder" ? selectedNode.path : null;
 
-    // details валиден только для текущего selectedConnector — иначе игнорируем.
-const detailsForCurrent = useMemo(
-  () =>
-    details && selectedConnector && details.name === selectedConnector.name
-      ? details
-      : null,
-  [details, selectedConnector],
-);
+  // details валиден только для текущего selectedConnector — иначе игнорируем.
+  const detailsForCurrent = useMemo(
+    () =>
+      details && selectedConnector && details.name === selectedConnector.name
+        ? details
+        : null,
+    [details, selectedConnector],
+  );
 
   const isFormOpen = creating || selectedConnector !== null;
 
@@ -780,6 +794,7 @@ const detailsForCurrent = useMemo(
               templates={templates}
               templatesByType={templatesByType}
               folderPath={creating ? creatingInFolder : undefined}
+              scriptBaseUrl={scriptBaseUrl}
               onSubmit={handleSubmit}
               onCancel={handleCancelForm}
               saving={busy}

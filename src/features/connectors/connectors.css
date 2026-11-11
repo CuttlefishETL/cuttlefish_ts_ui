@@ -547,3 +547,19 @@
 .props-footer {
   flex-shrink: 0;
 }
+
+.props-script-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.props-script-field > input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.props-script-btn {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  line-height: 1;
+}

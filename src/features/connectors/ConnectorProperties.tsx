@@ -14,12 +14,15 @@ import type {
   Direction,
   ParamMeta,
 } from "./types";
+import { ScriptParamField } from "./ScriptParamField";
 
 interface Props {
   initialValue: ConnectorInstance | null;
   templates: ConnectorTemplate[];
   templatesByType: Record<string, ConnectorTemplate>;
   folderPath?: string;
+  /** baseUrl для загрузки дерева скриптов в параметрах data_type === "script" */
+  scriptBaseUrl: string;
   onSubmit: (input: ConnectorInput) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
@@ -80,6 +83,7 @@ export function ConnectorProperties({
   templates,
   templatesByType,
   folderPath,
+  scriptBaseUrl,
   onSubmit,
   onCancel,
   saving,
@@ -111,8 +115,6 @@ export function ConnectorProperties({
     return Math.max(MIN_TOP, Math.min(maxTop, h));
   }, []);
 
-  // После первого рендера (и при каждом появлении split-контейнера)
-  // подтягиваем topHeight к реальной высоте контейнера.
   useLayoutEffect(() => {
     const container = splitContainerRef.current;
     if (!container) return;
@@ -121,7 +123,6 @@ export function ConnectorProperties({
     setTopHeight((h) => clampTop(h, totalH));
   }, [clampTop]);
 
-  // Реагируем на resize окна/панели: не даём topHeight выйти за пределы.
   useEffect(() => {
     const container = splitContainerRef.current;
     if (!container) return;
@@ -134,7 +135,6 @@ export function ConnectorProperties({
     return () => ro.disconnect();
   }, [clampTop]);
 
-  // Сохраняем актуальную высоту в localStorage при изменении.
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, String(topHeight));
@@ -458,6 +458,7 @@ export function ConnectorProperties({
                   value={params[key]}
                   onChange={(v) => setParam(key, v)}
                   disabled={saving}
+                  scriptBaseUrl={scriptBaseUrl}
                 />
               ))}
             </div>
@@ -531,9 +532,17 @@ interface ParamRowProps {
   value: unknown;
   onChange: (v: unknown) => void;
   disabled: boolean;
+  scriptBaseUrl: string;
 }
 
-function ParamRow({ name, meta, value, onChange, disabled }: ParamRowProps) {
+function ParamRow({
+  name,
+  meta,
+  value,
+  onChange,
+  disabled,
+  scriptBaseUrl,
+}: ParamRowProps) {
   return (
     <FieldRow
       label={name}
@@ -611,6 +620,16 @@ function ParamRow({ name, meta, value, onChange, disabled }: ParamRowProps) {
             rows={4}
             spellCheck={false}
             placeholder={meta.data_type === "array" ? "[]" : "{}"}
+          />
+        );
+
+      case "script":
+        return (
+          <ScriptParamField
+            value={typeof value === "string" ? value : ""}
+            onChange={onChange}
+            disabled={disabled}
+            baseUrl={scriptBaseUrl}
           />
         );
 

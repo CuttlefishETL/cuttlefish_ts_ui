@@ -50,6 +50,7 @@ function normalizeDataType(v: unknown): DataType {
   const lower = v.toLowerCase();
   switch (lower) {
     case "string":
+    case "script":
     case "integer":
     case "number":
     case "boolean":

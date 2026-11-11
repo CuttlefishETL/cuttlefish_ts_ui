@@ -11,6 +11,7 @@ export type DataType =
   | "array"
   | "duration"
   | "uri"
+  | "script"
   | "hostname";
 
 export interface ParamMeta {
