@@ -16,9 +16,9 @@ export interface UseConnectionsResult {
   authTarget: Server | null;
   runChecks: (list: Server[]) => Promise<void>;
   refresh: (servers: ServerNode[]) => Promise<void>;
-  connect: (id: string, servers: ServerNode[]) => void;
+  connect: (id: string, servers: ServerNode[]) => Promise<void>;
   disconnect: (id: string) => void;
-  reconnect: (id: string, servers: ServerNode[]) => void;
+  reconnect: (id: string, servers: ServerNode[]) => Promise<void>;
   serverDoubleClick: (id: string, servers: ServerNode[]) => void;
   submitAuth: () => void;
   cancelAuth: () => void;
@@ -93,7 +93,6 @@ export function useConnections(
         }
       }
 
-      // Убираем id, которых больше нет в списке, либо чей токен был стёрт извне.
       for (const id of [...next]) {
         const s = byId.get(id);
         if (!s) {
@@ -116,16 +115,28 @@ export function useConnections(
     });
   }, [servers]);
 
+  /** Проверяет, что сервер отвечает на /health. Возвращает true/false. */
+  const probeServer = useCallback(
+    async (server: Server): Promise<boolean> => {
+      setCheckStatuses((prev) => ({ ...prev, [server.id]: "checking" }));
+      const res = await checkConnection(server.url, server.port);
+      setCheckStatuses((prev) => ({ ...prev, [server.id]: res.status }));
+      return res.status === "ok";
+    },
+    [],
+  );
+
   const connect = useCallback(
-    (id: string, current: ServerNode[]): void => {
+    async (id: string, current: ServerNode[]): Promise<void> => {
       if (connectedIds.has(id)) return;
       const server = findServerById(current, id);
       if (!server) return;
 
-      // Если токен уже сохранён — считаем подключённым без диалога.
+      // Тихое переподключение при сохранённом токене — без диалога.
       try {
         if (getToken(buildBaseUrl(server.url, server.port))) {
           setConnectedIds((prev) => {
+            if (prev.has(id)) return prev;
             const next = new Set(prev);
             next.add(id);
             return next;
@@ -133,12 +144,16 @@ export function useConnections(
           return;
         }
       } catch {
-        // упадём в открытие диалога
+        // некорректный URL — падаем в healthcheck
       }
+
+      // Токена нет — нужна авторизация. Но только если сервер жив.
+      const alive = await probeServer(server);
+      if (!alive) return;
 
       setAuthTarget(server);
     },
-    [connectedIds],
+    [connectedIds, probeServer],
   );
 
   const disconnect = useCallback((id: string): void => {
@@ -159,29 +174,35 @@ export function useConnections(
   }, []);
 
   const reconnect = useCallback(
-    (id: string, current: ServerNode[]): void => {
+    async (id: string, current: ServerNode[]): Promise<void> => {
       const server = findServerById(current, id);
-      if (server) {
-        try {
-          logout(buildBaseUrl(server.url, server.port));
-        } catch {
-          // некорректный URL
-        }
+      if (!server) return;
+
+      try {
+        logout(buildBaseUrl(server.url, server.port));
+      } catch {
+        // некорректный URL
       }
       setConnectedIds((prev) => {
+        if (!prev.has(id)) return prev;
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
-      if (server) setAuthTarget(server);
+
+      // Диалог только если сервер ответил на healthcheck.
+      const alive = await probeServer(server);
+      if (!alive) return;
+
+      setAuthTarget(server);
     },
-    [],
+    [probeServer],
   );
 
   const serverDoubleClick = useCallback(
     (id: string, current: ServerNode[]): void => {
       if (connectedIds.has(id)) return;
-      connect(id, current);
+      void connect(id, current);
     },
     [connectedIds, connect],
   );
@@ -204,13 +225,10 @@ export function useConnections(
   const reset = useCallback((): void => {
     setCheckStatuses({});
     setAuthTarget(null);
-    // connectedIds намеренно не трогаем: их согласует effect выше, когда
-    // изменится `servers` (например, при загрузке нового файла).
-    // Токены в localStorage тоже сохраняются — они привязаны к URL, а не к файлу.
+    // connectedIds согласует effect выше при изменении `servers`.
   }, []);
 
   const removeIds = useCallback((ids: Set<string>): void => {
-    // Чистим токены удаляемых серверов, пока их дескрипторы ещё доступны.
     for (const s of flattenServers(serversRef.current)) {
       if (!ids.has(s.id)) continue;
       try {
@@ -233,7 +251,7 @@ export function useConnections(
     setAuthTarget((cur) => (cur && ids.has(cur.id) ? null : cur));
   }, []);
 
-  // Реакция на 401 из интерсептора: сервер снимается с «подключён».
+  // Реакция на auth:expired (401 или сетевая ошибка из http.ts/checkConnection).
   useEffect(() => {
     const onExpired = (e: Event) => {
       const baseUrl = (e as CustomEvent<{ baseUrl: string }>).detail?.baseUrl;
@@ -246,18 +264,24 @@ export function useConnections(
         }
       });
       if (!match) return;
+
       setConnectedIds((prev) => {
         if (!prev.has(match.id)) return prev;
         const next = new Set(prev);
         next.delete(match.id);
         return next;
       });
+
+      setCheckStatuses((prev) => {
+        if (prev[match.id] === "error") return prev;
+        return { ...prev, [match.id]: "error" };
+      });
     };
     window.addEventListener("auth:expired", onExpired);
     return () => window.removeEventListener("auth:expired", onExpired);
   }, []);
 
-  // Периодический health-poll (без изменений)
+  // Периодический health-poll
   const runChecksRef = useRef(runChecks);
   runChecksRef.current = runChecks;
 

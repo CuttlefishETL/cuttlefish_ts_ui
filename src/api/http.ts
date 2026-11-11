@@ -33,14 +33,35 @@ export function createApiClient(baseURL = ""): AxiosInstance {
   client.interceptors.response.use(
     (r) => r,
     (error) => {
+      const key = resolveServerKey(error.config);
+      if (!key) return Promise.reject(error);
+
+      // 401 — токен невалиден
       if (error.response?.status === 401) {
-        const key = resolveServerKey(error.config);
-        if (key) clearToken(key);
-        // сообщаем UI, что сессия этого сервера протухла
+        clearToken(key);
         window.dispatchEvent(
           new CustomEvent("auth:expired", { detail: { baseUrl: key } }),
         );
+        return Promise.reject(error);
       }
+
+      // Сетевая ошибка: сервер не ответил, отказ соединения, таймаут.
+      // Отмена через AbortController — это НЕ потеря связи (UI сам её вызвал).
+      const isCancel =
+        error.code === "ERR_CANCELED" || error.name === "CanceledError";
+
+      if (!error.response && !isCancel) {
+        clearToken(key);
+        window.dispatchEvent(
+          new CustomEvent("auth:expired", {
+            detail: {
+              baseUrl: key,
+              reason: error.code === "ECONNABORTED" ? "timeout" : "network",
+            },
+          }),
+        );
+      }
+
       return Promise.reject(error);
     },
   );
