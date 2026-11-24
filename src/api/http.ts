@@ -20,7 +20,7 @@ function resolveServerKey(
 export function createApiClient(baseURL = ""): AxiosInstance {
   const client = axios.create({
     baseURL,
-    headers: { "Content-Type": "application/json" },
+   // headers: { "Content-Type": "application/json" },
   });
 
   client.interceptors.request.use((config) => {
