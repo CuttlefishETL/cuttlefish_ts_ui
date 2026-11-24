@@ -15,8 +15,6 @@
 
 </div>
 
-![Cuttlefish-UI — главный экран](docs/screenshots/hero.png)
-
 ---
 
 ## Зачем это
