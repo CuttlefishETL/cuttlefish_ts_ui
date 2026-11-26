@@ -12,6 +12,7 @@ export function DebugToolbar() {
   const running = status === "running";
   const paused = status === "paused";
   const active = running || paused;
+  const disabled = true; //!active
 
   return (
     <div className="scripts-toolbar">
@@ -19,7 +20,7 @@ export function DebugToolbar() {
         type="button"
         className="toolbar-btn"
         onClick={() => stubDap.run()}
-        disabled={active}
+        disabled={disabled}
         title="Запустить скрипт"
       >
         ▶ Запуск
@@ -28,7 +29,7 @@ export function DebugToolbar() {
         type="button"
         className="toolbar-btn danger"
         onClick={() => stubDap.stop()}
-        disabled={!active}
+        disabled= {!active}
         title="Остановить"
       >
         ■ Стоп

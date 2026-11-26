@@ -117,21 +117,26 @@ export function getFileContent(path: string): string {
   return FILE_CONTENTS[path] ?? "-- empty file\n";
 }
 
-export const STUB_STACK_FRAMES: StackFrame[] = [
-  { id: 0, name: "main", file: "/scripts/main.lua", line: 7 },
+export const STUB_STACK_FRAMES: StackFrame[] = [];
+/*  
+{ id: 0, name: "main", file: "/scripts/main.lua", line: 7 },
   { id: 1, name: "compute", file: "/scripts/lib/utils.lua", line: 4 },
   { id: 2, name: "log", file: "/scripts/lib/helpers.lua", line: 4 },
 ];
+*/
 
-export const STUB_MESSAGES: OutputMessage[] = [
-  { id: 1, kind: "info", time: "12:00:01", text: "Debug session started" },
+export const STUB_MESSAGES: OutputMessage[] = [];
+/*
+{ id: 1, kind: "info", time: "12:00:01", text: "Debug session started" },
   { id: 2, kind: "log", time: "12:00:02", text: "Hello from main" },
   { id: 3, kind: "warn", time: "12:00:03", text: "Deprecated API used" },
   { id: 4, kind: "error", time: "12:00:04", text: "Attempt to index a nil value (local 'x')" },
 ];
+*/
 
-export const STUB_VARIABLES: Variable[] = [
-  { name: "x", value: "42", type: "number" },
+export const STUB_VARIABLES: Variable[] = [];
+/*  
+{ name: "x", value: "42", type: "number" },
   { name: "result", value: "84", type: "number" },
   { name: "msg", value: '"hello"', type: "string" },
   {
@@ -145,6 +150,7 @@ export const STUB_VARIABLES: Variable[] = [
     ],
   },
 ];
+*/
 
 // --- "DAP-клиент" (заглушка) ---
 type Listener = (state: DebugState) => void;
